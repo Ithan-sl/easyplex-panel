@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
         Builder::defaultStringLength(1000); // Update defaultStringLength
         Schema::defaultStringLength(191);
         //Model::preventLazyLoading();
-      //\Illuminate\Support\Facades\URL::forceScheme('https');
+        \Illuminate\Support\Facades\URL::forceScheme('https');
         error_reporting(0);
 
         app(AuthorizationServer::class)->enableGrantType(
