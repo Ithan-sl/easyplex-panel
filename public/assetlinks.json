@@ -1,0 +1,9 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.easyplexdemoapp",
+    "sha256_cert_fingerprints":
+    ["77:84:11:CB:8F:41:0C:5E:34:4F:9E:36:F2:E4:A2:DE:F0:CF:7F:5A:03:02:25:68:2B:29:96:C5:2F:1A:E2:5C"]
+  }
+}]
