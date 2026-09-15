@@ -1733,6 +1733,10 @@ class MovieController extends Controller
 
         }
 
+        $rvContent = null;
+        $rvContentNetwork = null;
+        $rvContentLang = null;
+
         if ($settings->rv_content != null) {
             $rvContent = []; // Initialize an empty array
 
