@@ -340,6 +340,7 @@ Route::group(['prefix' => 'admin', 'middleware' => 'admin'], function () {
 
   // Langs
 
+  Route::get('/languages/tmdb', 'LanguagesController@tmdb');
   Route::get('/languages/data', 'LanguagesController@data');
   Route::post('/languages/store', 'LanguagesController@store');
   Route::delete('/languages/destroy/{langs}', 'LanguagesController@destroy');
