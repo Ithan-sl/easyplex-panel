@@ -28,23 +28,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        \Illuminate\Database\Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+            return new \App\Database\PostgresConnection($connection, $database, $prefix, $config);
+        });
 
-
-
-      //  env('DEBUGBAR_ENABLED', true);
-
+        if ($this->app->bound('db')) {
+            $db = $this->app->make('db');
+            foreach ($db->getConnections() as $conn) {
+                if ($conn instanceof \Illuminate\Database\PostgresConnection) {
+                    $conn->setQueryGrammar(new \App\Database\Query\Grammars\PostgresGrammar());
+                }
+            }
+        }
 
         Builder::defaultStringLength(1000); // Update defaultStringLength
         Schema::defaultStringLength(191);
         //Model::preventLazyLoading();
         \Illuminate\Support\Facades\URL::forceScheme('https');
         error_reporting(0);
-
-        \Illuminate\Database\Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
-            $conn = new \Illuminate\Database\PostgresConnection($connection, $database, $prefix, $config);
-            $conn->setQueryGrammar(new \App\Database\Query\Grammars\PostgresGrammar());
-            return $conn;
-        });
 
         app(AuthorizationServer::class)->enableGrantType(
             $this->makeFacebookGrant(), Passport::tokensExpireIn()
@@ -58,6 +59,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        \Illuminate\Database\Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+            return new \App\Database\PostgresConnection($connection, $database, $prefix, $config);
+        });
+
         $this->app->singleton(ContentQueryService::class, function ($app) {
             return new ContentQueryService();
         });
