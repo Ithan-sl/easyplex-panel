@@ -40,6 +40,12 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\URL::forceScheme('https');
         error_reporting(0);
 
+        \Illuminate\Database\Connection::resolverFor('pgsql', function ($connection, $database, $prefix, $config) {
+            $conn = new \Illuminate\Database\PostgresConnection($connection, $database, $prefix, $config);
+            $conn->setQueryGrammar(new \App\Database\Query\Grammars\PostgresGrammar());
+            return $conn;
+        });
+
         app(AuthorizationServer::class)->enableGrantType(
             $this->makeFacebookGrant(), Passport::tokensExpireIn()
         );
