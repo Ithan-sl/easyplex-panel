@@ -884,8 +884,7 @@ public function destroyNetworks($id)
 
 
         $genresSeries =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id LIMIT 1) AS genre_name');
 
         $moviesGenre = Serie::withOnly('genres.genre')
          ->where('id', '=', $serie)
@@ -1003,8 +1002,7 @@ public function destroyNetworks($id)
 
 
         $genresSeries =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id LIMIT 1) AS genre_name');
 
 
         $newEpisodes2 = DB::table('series')

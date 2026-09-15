@@ -936,22 +936,16 @@ class MovieController extends Controller
             , 'serie_videos.drmuuid', 'serie_videos.drmlicenceuri', 'serie_videos.drm', 'enable_stream', 'episodes.overview as epoverview'];
 
         $genresMovies =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN movie_genres ON genres.id = movie_genres.genre_id WHERE movie_genres.movie_id = movies.id)
-        AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN movie_genres ON genres.id = movie_genres.genre_id WHERE movie_genres.movie_id = movies.id LIMIT 1) AS genre_name');
 
         $genresSeries =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id LIMIT 1) AS genre_name');
 
         $genresAnimes =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN anime_genres ON genres.id = anime_genres.genre_id WHERE anime_genres.anime_id = animes.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN anime_genres ON genres.id = anime_genres.genre_id WHERE anime_genres.anime_id = animes.id LIMIT 1) AS genre_name');
 
         $genresLive =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(categories.name, ', '), ",", 1)
-        FROM categories JOIN livetv_genres ON categories.id
-        = livetv_genres.category_id WHERE livetv_genres.livetv_id = livetvs.id) AS genre_name');
+        DB::raw('(SELECT categories.name FROM categories JOIN livetv_genres ON categories.id = livetv_genres.category_id WHERE livetv_genres.livetv_id = livetvs.id LIMIT 1) AS genre_name');
 
         $selectSerie = [
             'series.id', 'series.name', 'poster_path', 'backdrop_path',
@@ -2085,17 +2079,13 @@ class MovieController extends Controller
     {
 
         $genresMovies =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-    FROM genres JOIN movie_genres ON genres.id = movie_genres.genre_id WHERE movie_genres.movie_id = movies.id)
-    AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN movie_genres ON genres.id = movie_genres.genre_id WHERE movie_genres.movie_id = movies.id LIMIT 1) AS genre_name');
 
         $genresSeries =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-    FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id LIMIT 1) AS genre_name');
 
         $genresAnimes =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-    FROM genres JOIN anime_genres ON genres.id = anime_genres.genre_id WHERE anime_genres.anime_id = animes.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN anime_genres ON genres.id = anime_genres.genre_id WHERE anime_genres.anime_id = animes.id LIMIT 1) AS genre_name');
 
         $selectMovie = [
             'id', 'title AS name', 'poster_path', 'backdrop_path',

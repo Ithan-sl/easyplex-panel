@@ -46,18 +46,13 @@ class NetworkController extends Controller
 
 
         $genresMovies =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN movie_genres ON genres.id = movie_genres.genre_id WHERE movie_genres.movie_id = movies.id)
-        AS genre_name');
-
+        DB::raw('(SELECT genres.name FROM genres JOIN movie_genres ON genres.id = movie_genres.genre_id WHERE movie_genres.movie_id = movies.id LIMIT 1) AS genre_name');
 
         $genresSeries =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN serie_genres ON genres.id = serie_genres.genre_id WHERE serie_genres.serie_id = series.id LIMIT 1) AS genre_name');
 
         $genresAnimes =
-        DB::raw('(SELECT SUBSTRING_INDEX(GROUP_CONCAT(genres.name, ', '), ",", 1)
-        FROM genres JOIN anime_genres ON genres.id = anime_genres.genre_id WHERE anime_genres.anime_id = animes.id) AS genre_name');
+        DB::raw('(SELECT genres.name FROM genres JOIN anime_genres ON genres.id = anime_genres.genre_id WHERE anime_genres.anime_id = animes.id LIMIT 1) AS genre_name');
 
 
         $selectSerie = [

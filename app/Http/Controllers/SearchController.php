@@ -27,10 +27,10 @@ class SearchController extends Controller
         $settings = Setting::query()->first();
     
         $genreSubquery = "
-            (SELECT SUBSTRING_INDEX(GROUP_CONCAT(:genre_table.name, ', '), ',', 1)
+            (SELECT :genre_table.name
              FROM :genre_table
              JOIN :join_table ON :genre_table.id = :join_table.:genre_id
-             WHERE :join_table.:content_id = :content_table.id) AS genre_name
+             WHERE :join_table.:content_id = :content_table.id LIMIT 1) AS genre_name
         ";
     
         $unionQueries = [];
