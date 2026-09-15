@@ -923,9 +923,10 @@ public function animesEpisodesAll()
         ->where('animes.active', '=', 1)
         ->join('anime_seasons', 'anime_seasons.anime_id', '=', 'animes.id')
         ->join('anime_episodes', 'anime_episodes.anime_season_id', '=', 'anime_seasons.id')
-        ->join('anime_videos', 'anime_videos.anime_episode_id', '=', 'anime_episodes.id')
+        ->join('anime_videos', function ($join) {
+            $join->on('anime_videos.id', '=', DB::raw('(SELECT id FROM anime_videos WHERE anime_videos.anime_episode_id = anime_episodes.id ORDER BY updated_at DESC LIMIT 1)'));
+        })
         ->orderBy('anime_videos.updated_at', $order)
-        ->orderBy('anime_videos.anime_episode_id', $order)
         ->select(
             'anime_videos.anime_episode_id',
             'animes.id',
@@ -958,7 +959,6 @@ public function animesEpisodesAll()
             'animes.imdb_external_id'
         )
         ->addSelect(DB::raw("'anime' as type"))
-        ->groupBy('anime_episode_id')
         ->paginate(12);
 
     // Hide unnecessary fields before returning

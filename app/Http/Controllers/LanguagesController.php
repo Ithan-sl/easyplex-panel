@@ -452,7 +452,7 @@ class LanguagesController extends Controller
                     });
             })
                 ->orderByDesc('created_at')
-                ->groupBy('id');
+                ->distinct();
 
 
         }else {

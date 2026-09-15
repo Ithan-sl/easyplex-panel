@@ -1017,13 +1017,11 @@ public function destroyNetworks($id)
             ->join('seasons', 'seasons.serie_id', '=', 'series.id')
             ->join('episodes', 'episodes.season_id', '=', 'seasons.id')
             ->join('serie_videos', function ($join) {
-                $join->on('serie_videos.episode_id', '=', 'episodes.id')
-                    ->orderBy('serie_videos.updated_at', 'desc');
+                $join->on('serie_videos.id', '=', DB::raw('(SELECT id FROM serie_videos WHERE serie_videos.episode_id = episodes.id ORDER BY updated_at DESC LIMIT 1)'));
             })
             ->where('series.active', '=', 1)
             ->limit(20)
             ->orderBy('serie_videos.updated_at', 'desc')
-            ->groupBy('episodes.id')
             ->paginate();
 
 

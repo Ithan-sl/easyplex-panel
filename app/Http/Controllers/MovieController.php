@@ -1703,13 +1703,11 @@ class MovieController extends Controller
             ->join('seasons', 'seasons.serie_id', '=', 'series.id')
             ->join('episodes', 'episodes.season_id', '=', 'seasons.id')
             ->join('serie_videos', function ($join) {
-                $join->on('serie_videos.episode_id', '=', 'episodes.id')
-                    ->orderBy('serie_videos.updated_at', 'desc');
+                $join->on('serie_videos.id', '=', DB::raw('(SELECT id FROM serie_videos WHERE serie_videos.episode_id = episodes.id ORDER BY updated_at DESC LIMIT 1)'));
             })
             ->where('series.active', '=', 1)
             ->limit(20)
             ->orderBy('serie_videos.updated_at', 'desc')
-            ->groupBy('episodes.id')
             ->get();
 
         if ($settings->anime) {
@@ -1726,13 +1724,11 @@ class MovieController extends Controller
                 ->join('anime_seasons', 'anime_seasons.anime_id', '=', 'animes.id')
                 ->join('anime_episodes', 'anime_episodes.anime_season_id', '=', 'anime_seasons.id')
                 ->join('anime_videos', function ($join) {
-                    $join->on('anime_videos.anime_episode_id', '=', 'anime_episodes.id')
-                        ->orderBy('anime_videos.updated_at', 'desc');
+                    $join->on('anime_videos.id', '=', DB::raw('(SELECT id FROM anime_videos WHERE anime_videos.anime_episode_id = anime_episodes.id ORDER BY updated_at DESC LIMIT 1)'));
                 })
                 ->where('animes.active', '=', 1)
                 ->limit(20)
                 ->orderBy('anime_videos.updated_at', 'desc')
-                ->groupBy('anime_episode_id')
                 ->get();
 
         }
@@ -1975,7 +1971,7 @@ class MovieController extends Controller
                     })
                         ->limit(15)
                         ->orderByDesc('created_at')
-                        ->groupBy('id')->get();
+                        ->distinct()->get();
 
                 } else {
 
@@ -2008,7 +2004,7 @@ class MovieController extends Controller
                     })
                         ->limit(15)
                         ->orderByDesc('created_at')
-                        ->groupBy('id')->get();
+                        ->distinct()->get();
 
                 }
             }

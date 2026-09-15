@@ -2816,7 +2816,7 @@ class GenreController extends Controller
                 ->where('genres.name', 'LIKE', $network);
         });
     })
-        ->groupBy('id')
+        ->distinct()
         ->orderByDesc('created_at');
 
     return response()->json($results->paginate(12), 200); // Return the results instead of the sanitized search string
