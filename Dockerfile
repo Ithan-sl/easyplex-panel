@@ -39,12 +39,17 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . /var/www/html
 
+# Download and extract vendor dependencies
+RUN curl -sL https://github.com/Ithan-sl/easyplex-panel/releases/download/v1.0/vendor.zip -o /var/www/html/vendor.zip \
+    && unzip -q /var/www/html/vendor.zip -d /var/www/html/ \
+    && rm /var/www/html/vendor.zip
+
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/vendor \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 10000 8080 80
