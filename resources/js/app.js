@@ -36,8 +36,8 @@ import Spinner from 'vue-simple-spinner'
 Vue.component('vue-simple-spinner', Spinner);
 import VueCarousel from 'vue-carousel';
 Vue.use(VueCarousel);
-import { slider, slideritem } from 'vue-concise-slider'
-Vue.use(slider);
+// import { slider, slideritem } from 'vue-concise-slider'
+// Vue.use(slider);
 import VueGlide from 'vue-glide-js'
 import 'vue-glide-js/dist/vue-glide.css'
 Vue.use(VueGlide)

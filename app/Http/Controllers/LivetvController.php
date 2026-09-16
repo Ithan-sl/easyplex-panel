@@ -212,7 +212,7 @@ class LivetvController extends Controller
             foreach ($request->links as $link) {
 
                 $movieVideo = new LivetvVideo();
-                $movieVideo->fill($link);
+                $movieVideo->fill(\App\Helpers\EmbedHelper::formatVideoLink($link));
                 $movieVideo->livetv_id = $livetv->id;
                 $movieVideo->save();
             }
@@ -279,7 +279,7 @@ class LivetvController extends Controller
                 if (!isset($link['id'])) {
                     $movieVideo = new LivetvVideo();
                     $movieVideo->livetv_id = $livetv->id;
-                    $movieVideo->fill($link);
+                    $movieVideo->fill(\App\Helpers\EmbedHelper::formatVideoLink($link));
                     $movieVideo->save();
                 }
             }

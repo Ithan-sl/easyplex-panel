@@ -363,7 +363,7 @@ class SerieController extends Controller
                     foreach ($reqEpisode['videos'] as $reqVideo) {
 
                         $video = SerieVideo::query()->find($reqVideo['id'] ?? 0) ?? new SerieVideo();
-                        $video->fill($reqVideo);
+                        $video->fill(\App\Helpers\EmbedHelper::formatVideoLink($reqVideo));
                         $video->episode_id = $episode->id;
                         $video->save();
                     }
@@ -609,7 +609,7 @@ class SerieController extends Controller
                             foreach ($reqEpisode['videos'] as $reqVideo) {
 
                                 $video = SerieVideo::find($reqVideo['id'] ?? 0) ?? new SerieVideo();
-                                $video->fill($reqVideo);
+                                $video->fill(\App\Helpers\EmbedHelper::formatVideoLink($reqVideo));
                                 $video->episode_id = $episode->id;
                                 $video->save();
                             }

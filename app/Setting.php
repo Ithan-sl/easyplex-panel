@@ -115,7 +115,14 @@ class Setting extends Model
         'disablelogin' => 'int',
         'vidsrc' => 'int',
         'enable_collections' => 'int',
-
+        'keep_local_copy' => 'int',
+        'ftp_storage' => 'int',
+        'ftp_port' => 'int',
+        'ftp_pasv' => 'int',
+        'ftp_ssl' => 'int',
+        'webdav_storage' => 'int',
+        'sftp_storage' => 'int',
+        'sftp_port' => 'int',
     ];
    
 }

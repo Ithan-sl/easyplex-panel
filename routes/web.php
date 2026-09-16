@@ -288,21 +288,17 @@ Route::group(['prefix' => 'admin', 'middleware' => 'admin'], function () {
 
 
   // Spoken Langs
-
-  Route::get('/spokenlangs/datawebspokenlangs', 'SpokenLanguagesController@datawebspokenlangs');
-  Route::post('/spokenlangs/store', 'SpokenLanguagesController@store');
-  Route::put('/spokenlangs/update/{network}', 'SpokenLanguagesController@update');
-
-
-  Route::delete('/movies/spokenlangs/destroy/{movievideo}', 'SpokenLanguagesController@destroyLangs');
+  // Route::get('/spokenlangs/datawebspokenlangs', 'SpokenLanguagesController@datawebspokenlangs');
+  // Route::post('/spokenlangs/store', 'SpokenLanguagesController@store');
+  // Route::put('/spokenlangs/update/{network}', 'SpokenLanguagesController@update');
+  // Route::delete('/movies/spokenlangs/destroy/{movievideo}', 'SpokenLanguagesController@destroyLangs');
 
 
   // Production Companies
-
-  Route::get('/productioncompanies/datawebproductioncompanies', 'ProductionCompanyController@datawebproductioncompanies');
-  Route::post('/productioncompanies/store', 'NetworkController@store');
-  Route::delete('/productioncompanies/destroy/{network}', 'NetworkController@destroy');
-  Route::put('/productioncompanies/update/{network}', 'NetworkController@update');
+  // Route::get('/productioncompanies/datawebproductioncompanies', 'ProductionCompanyController@datawebproductioncompanies');
+  // Route::post('/productioncompanies/store', 'NetworkController@store');
+  // Route::delete('/productioncompanies/destroy/{network}', 'NetworkController@destroy');
+  // Route::put('/productioncompanies/update/{network}', 'NetworkController@update');
 
 
   // Networks
@@ -395,7 +391,9 @@ Route::group(['prefix' => 'admin', 'middleware' => 'admin'], function () {
     // Videos
     Route::post('/video/store', 'VideoController@store');
     Route::post('/video/anime/store', 'VideoController@store');
+    Route::post('/video/remote-upload', 'VideoController@remoteUpload');
     Route::post('/streaming/store', 'VideoController@Streamingstore');
+    Route::post('/storage/test', 'VideoController@testStorage');
 
 
     // Substitles

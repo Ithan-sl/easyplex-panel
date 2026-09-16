@@ -258,7 +258,9 @@ public function streamtape(Request $request)
     function __destruct()
     {
         session_write_close();
-        curl_close($this->ch);
+        if ($this->ch) {
+            curl_close($this->ch);
+        }
     }
  
 }

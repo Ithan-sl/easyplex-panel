@@ -290,7 +290,7 @@ class MovieController extends Controller
             foreach ($request->links as $link) {
 
                 $movieVideo = new MovieVideo();
-                $movieVideo->fill($link);
+                $movieVideo->fill(\App\Helpers\EmbedHelper::formatVideoLink($link));
                 $movieVideo->movie_id = $movie->id;
                 $movieVideo->save();
             }
@@ -656,7 +656,7 @@ class MovieController extends Controller
                 if (!isset($link['id'])) {
                     $movieVideo = new MovieVideo();
                     $movieVideo->movie_id = $movie->id;
-                    $movieVideo->fill($link);
+                    $movieVideo->fill(\App\Helpers\EmbedHelper::formatVideoLink($link));
                     $movieVideo->save();
                 }
             }

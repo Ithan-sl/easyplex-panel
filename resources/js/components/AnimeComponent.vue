@@ -574,10 +574,16 @@
                       <input
                         class="form-control"
                         id="link"
-                        placeholder="Upload or Insert Direct  Link"
+                        placeholder="Upload, Direct Link or Embed URL / <iframe>"
                         type="text"
                         v-model="link"
                       />
+                      <div class="form-check mt-2">
+                        <label class="form-check-label text-muted">
+                          <input type="checkbox" class="form-check-input" v-model="embed">
+                          Embed Player (Streamtape, Dood, YouTube, iFrame, etc.)
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -593,18 +599,57 @@
 
                   <div class="col-md-6">
                     <div class="form-group">
-                      <label>Upload Stream</label>
-                      <input class="file-upload-default" />
-                      <div class="input-group col-xs-12">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="mb-0"><strong>Stream Upload</strong></label>
+                        <div class="btn-group btn-group-sm">
+                          <button
+                            type="button"
+                            class="btn btn-xs"
+                            :class="uploadMode === 'file' ? 'btn-primary' : 'btn-outline-secondary'"
+                            @click="uploadMode = 'file'"
+                          >
+                            Local File
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-xs ml-1"
+                            :class="uploadMode === 'remote' ? 'btn-info' : 'btn-outline-secondary'"
+                            @click="uploadMode = 'remote'"
+                          >
+                            Remote URL
+                          </button>
+                        </div>
+                      </div>
+
+                      <div v-if="uploadMode === 'file'" class="input-group col-xs-12">
                         <input
                           @change="storeVideo"
                           class="form-control file-upload-info"
                           id="video"
-                          placeholder="Upload Image"
                           type="file"
                         />
                         <span class="input-group-append">
-                          <button class="file-upload-browse btn btn-primary" type="button">Upload</button>
+                          <button class="file-upload-browse btn btn-primary" type="button">Browse</button>
+                        </span>
+                      </div>
+
+                      <div v-else class="input-group col-xs-12">
+                        <input
+                          v-model="remoteVideoUrl"
+                          class="form-control"
+                          placeholder="https://example.com/video.mp4"
+                          type="text"
+                        />
+                        <span class="input-group-append">
+                          <button
+                            @click.prevent="fetchRemoteVideo"
+                            class="btn btn-info"
+                            type="button"
+                            :disabled="loading || !remoteVideoUrl"
+                          >
+                            <span v-if="loading" class="spinner-border spinner-border-sm mr-1"></span>
+                            Fetch & Store
+                          </button>
                         </span>
                       </div>
                     </div>
@@ -621,7 +666,8 @@
                       <th scope="col" class="col-md-2">Actions</th>
                       <th scope="col" class="col-md-1">Lang</th>
                       <th scope="col" class="col-md-2">Server</th>
-                      <th scope="col" class="col-md-6">Link</th>
+                      <th scope="col" class="col-md-5">Link</th>
+                      <th scope="col" class="col-md-2">Type</th>
                     </tr>
                   </thead>
                   <tbody name="links">
@@ -640,7 +686,11 @@
                       </td>
                       <td class="col-md-1">{{item.lang}}</td>
                       <td class="col-md-2">{{item.server}}</td>
-                      <td class="col-md-6">{{item.link}}</td>
+                      <td class="col-md-5">{{item.link}}</td>
+                      <td class="col-md-2">
+                        <span class="badge badge-primary" v-if="item.embed == 1">Embed</span>
+                        <span class="badge badge-secondary" v-else>Direct</span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -705,6 +755,9 @@ export default {
       selectedEpisode: -1,
 
       link: "",
+      uploadMode: "file",
+      remoteVideoUrl: "",
+      embed: false,
       linksubstitle: "",
       options: [],
       addseason: "",
@@ -1050,14 +1103,36 @@ export default {
         }
       }
     },
+
+    // fetch a remote video URL and upload directly on the server
+    async fetchRemoteVideo() {
+      if (!this.remoteVideoUrl) return;
+      try {
+        this.loading = true;
+        const response = await axios.post(url + "/admin/video/remote-upload", {
+          url: this.remoteVideoUrl,
+        });
+        this.link = response.data.video_path;
+        this.server = { name: response.data.server };
+        this.showSuccess(
+          response.data.message || "Video fetched and uploaded successfully!"
+        );
+        this.remoteVideoUrl = "";
+      } catch (error) {
+        const msg =
+          error.response && error.response.data && error.response.data.message
+            ? error.response.data.message
+            : "Remote upload failed";
+        this.showAlert(msg);
+      } finally {
+        this.loading = false;
+      }
+    },
+
     // add a video link to an episode
     addLink() {
-      if (
-        this.selectedServer === "" ||
-        this.link === "" ||
-        this.form.anime === "" ||
-        this.selectedServer === 0
-      ) {
+      if (this.server === "" || this.link === "" || this.form.anime === "") {
+        this.showAlert("You need to select a server before adding a link");
         return;
       }
       const episode = this.form.anime.seasons[this.selectedSeason].episodes[
@@ -1068,9 +1143,29 @@ export default {
         Vue.set(episode, "videos", []);
       }
 
+      let linkVal = this.link.trim();
+      let isEmbed = this.embed ? 1 : 0;
+
+      // Auto-detect iframe
+      const iframeMatch = linkVal.match(/<iframe.*?src=["'](.*?)["']/i);
+      if (iframeMatch) {
+        linkVal = iframeMatch[1];
+        isEmbed = 1;
+      } else if (!isEmbed) {
+        const lower = linkVal.toLowerCase();
+        if (lower.includes('/embed/') || lower.includes('/e/') || lower.includes('/v/') ||
+            lower.includes('streamtape') || lower.includes('dood') || lower.includes('filemoon') ||
+            lower.includes('mixdrop') || lower.includes('superembed') || lower.includes('vidsrc') ||
+            lower.includes('vidmoly') || lower.includes('voe.') || lower.includes('upstream.') ||
+            lower.includes('ok.ru/videoembed') || lower.includes('youtube.com/embed') || lower.includes('youtu.be')) {
+          isEmbed = 1;
+        }
+      }
+
       episode.videos.unshift({
         server: this.server.name,
-        link: this.link,
+        link: linkVal,
+        embed: isEmbed,
         lang:
           this.lang.iso_639_1 && this.lang.iso_639_1 !== "xx"
             ? this.lang.iso_639_1
@@ -1079,6 +1174,7 @@ export default {
       this.link = "";
       this.server = "";
       this.video = null;
+      this.embed = false;
     },
 
     // delete a video link from an episode

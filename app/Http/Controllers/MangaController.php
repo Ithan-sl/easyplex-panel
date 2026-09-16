@@ -365,7 +365,7 @@ public function onSaveEpisodes($request, $reqSeason,$season) {
             if (isset($reqEpisode['videos'])) {
                 foreach ($reqEpisode['videos'] as $reqVideo) {
                     $video = AnimeVideo::find($reqVideo['id'] ?? 0) ?? new AnimeVideo();
-                    $video->fill($reqVideo);
+                    $video->fill(\App\Helpers\EmbedHelper::formatVideoLink($reqVideo));
                     $video->anime_episode_id = $episode->id;
                     $video->save();
                 }
@@ -612,7 +612,7 @@ public function onUpdateAnimeEpisodes ($request,$reqSeason,$season) {
                     if (isset($reqEpisode['videos'])) {
                         foreach ($reqEpisode['videos'] as $reqVideo) {
                             $video = AnimeVideo::find($reqVideo['id'] ?? 0) ?? new AnimeVideo();
-                            $video->fill($reqVideo);
+                            $video->fill(\App\Helpers\EmbedHelper::formatVideoLink($reqVideo));
                             $video->anime_episode_id = $episode->id;
                             $video->save();
                         }

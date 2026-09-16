@@ -92,7 +92,7 @@
                     href="#aws"
                     id="aws-tab"
                     role="tab"
-                  >Amazon Web Services</a>
+                  >Storage & Cloud</a>
                 </li>
 
 
@@ -819,71 +819,296 @@
                 >
              <div class="settings">
           
-                    <div class="row mb-2">
-                      <div class="col-md-3">
-                        <div class="form-check">
-                          <div class="custom-control custom-switch ml-2">
-                            <input
-                              v-model="settings.aws_s3_storage"
-                              type="checkbox"
-                              class="custom-control-input"
-                              id="aws_s3_storage"
-                            />
-                            <label class="custom-control-label" for="aws_s3_storage">AWS S3 Storage</label>
+              <div class="settings">
+                    <h4 class="mb-3"><i class="mdi mdi-cloud mr-1"></i> Storage & Cloud Configuration</h4>
+                    
+                    <!-- Global Active Storage Selection -->
+                    <div class="card p-3 mb-4" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
+                      <div class="row">
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="active_storage"><strong>Active Video Storage Provider</strong></label>
+                            <select v-model="settings.active_storage" id="active_storage" class="form-control">
+                              <option value="local">Local Storage (Server Disk)</option>
+                              <option value="s3">Amazon AWS S3</option>
+                              <option value="wasabi">Wasabi Cloud Storage</option>
+                              <option value="ftp">FTP Server</option>
+                              <option value="webdav">WebDAV (Nextcloud / ownCloud / Box / Apache)</option>
+                              <option value="sftp">SFTP / SCP / RSync</option>
+                            </select>
+                            <small class="form-text text-muted">Select where uploaded and remote videos will be saved.</small>
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label><strong>Local Storage (Server Disk)</strong></label>
+                            <div class="custom-control custom-switch mt-2">
+                              <input
+                                v-model="settings.keep_local_copy"
+                                type="checkbox"
+                                class="custom-control-input"
+                                id="keep_local_copy"
+                                :true-value="1"
+                                :false-value="0"
+                              />
+                              <label class="custom-control-label" for="keep_local_copy">Keep Local Copy when using Remote Storage</label>
+                            </div>
+                            <small class="form-text text-muted">When disabled (optional local storage), videos are uploaded directly to the remote destination and not stored on the local server disk.</small>
                           </div>
                         </div>
                       </div>
                     </div>
-                    
-                    <div class="row">
-                      <div class="col-md-12">
-                        <div class="form-group">
-                          <label for="aws_access_key_id">AWS access key ID</label>
-                          <input
-                            v-model="settings.aws_access_key_id"
-                            id="aws_access_key_id"
-                            type="text"
-                            class="form-control"
-                          />
+
+                    <!-- 1. Amazon AWS S3 -->
+                    <div class="card mb-3 p-3" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5><i class="mdi mdi-amazon mr-1"></i> Amazon AWS S3</h5>
+                        <div>
+                          <button type="button" class="btn btn-sm btn-outline-info" @click="testStorage('s3')">
+                            <i class="mdi mdi-check-circle-outline mr-1"></i> Test Connection
+                          </button>
                         </div>
-                        </div>
-                      <div class="col-md-12">
-                        <div class="form-group">
-                          <label for="aws_secret_access_key">AWS secret access key</label>
-                          <input
-                            v-model="settings.aws_secret_access_key"
-                            id="aws_secret_access_key"
-                            type="text"
-                            class="form-control"
-                          />
-                        </div>
-                        </div>
-                      <div class="col-md-12">
-                        <div class="form-group">
-                          <label for="aws_default_region">AWS default region</label>
-                          <input
-                            v-model="settings.aws_default_region"
-                            id="aws_default_region"
-                            type="text"
-                            class="form-control"
-                          />
-                        </div>
-                        </div>
-                      <div class="col-md-12">
-                        <div class="form-group">
-                          <label for="aws_bucket">AWS bucket</label>
-                          <input
-                            v-model="settings.aws_bucket"
-                            id="aws_bucket"
-                            type="text"
-                            class="form-control"
-                          />
-                        </div>
-                        
                       </div>
+                      <div class="row">
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="aws_access_key_id">Access Key ID</label>
+                            <input v-model="settings.aws_access_key_id" id="aws_access_key_id" type="text" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="aws_secret_access_key">Secret Access Key</label>
+                            <input v-model="settings.aws_secret_access_key" id="aws_secret_access_key" type="password" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="aws_default_region">Default Region</label>
+                            <input v-model="settings.aws_default_region" id="aws_default_region" type="text" class="form-control" placeholder="e.g. us-east-1" />
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="aws_bucket">Bucket Name</label>
+                            <input v-model="settings.aws_bucket" id="aws_bucket" type="text" class="form-control" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 2. Wasabi Cloud -->
+                    <div class="card mb-3 p-3" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5><i class="mdi mdi-cloud-outline mr-1"></i> Wasabi Cloud Storage</h5>
+                        <div>
+                          <button type="button" class="btn btn-sm btn-outline-info" @click="testStorage('wasabi')">
+                            <i class="mdi mdi-check-circle-outline mr-1"></i> Test Connection
+                          </button>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="wasabi_access_key_id">Wasabi Access Key ID</label>
+                            <input v-model="settings.wasabi_access_key_id" id="wasabi_access_key_id" type="text" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="wasabi_secret_access_key">Wasabi Secret Access Key</label>
+                            <input v-model="settings.wasabi_secret_access_key" id="wasabi_secret_access_key" type="password" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="wasabi_default_region">Wasabi Region</label>
+                            <input v-model="settings.wasabi_default_region" id="wasabi_default_region" type="text" class="form-control" placeholder="e.g. us-east-1" />
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="wasabi_bucket">Wasabi Bucket</label>
+                            <input v-model="settings.wasabi_bucket" id="wasabi_bucket" type="text" class="form-control" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 3. FTP Server -->
+                    <div class="card mb-3 p-3" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5><i class="mdi mdi-server-network mr-1"></i> FTP Server</h5>
+                        <div>
+                          <button type="button" class="btn btn-sm btn-outline-info" @click="testStorage('ftp')">
+                            <i class="mdi mdi-check-circle-outline mr-1"></i> Test Connection
+                          </button>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="ftp_host">FTP Host / IP</label>
+                            <input v-model="settings.ftp_host" id="ftp_host" type="text" class="form-control" placeholder="ftp.example.com" />
+                          </div>
+                        </div>
+                        <div class="col-md-2">
+                          <div class="form-group">
+                            <label for="ftp_port">Port</label>
+                            <input v-model="settings.ftp_port" id="ftp_port" type="number" class="form-control" placeholder="21" />
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="form-group">
+                            <label for="ftp_username">Username</label>
+                            <input v-model="settings.ftp_username" id="ftp_username" type="text" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="form-group">
+                            <label for="ftp_password">Password</label>
+                            <input v-model="settings.ftp_password" id="ftp_password" type="password" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="ftp_path">Remote Directory / Path</label>
+                            <input v-model="settings.ftp_path" id="ftp_path" type="text" class="form-control" placeholder="/public_html/videos" />
+                          </div>
+                        </div>
+                        <div class="col-md-5">
+                          <div class="form-group">
+                            <label for="ftp_url">Public Access Base URL</label>
+                            <input v-model="settings.ftp_url" id="ftp_url" type="text" class="form-control" placeholder="https://cdn.example.com/videos" />
+                            <small class="form-text text-muted">URL used by players to access the uploaded file.</small>
+                          </div>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-center">
+                          <div class="custom-control custom-switch mr-3">
+                            <input v-model="settings.ftp_pasv" type="checkbox" class="custom-control-input" id="ftp_pasv" :true-value="1" :false-value="0" />
+                            <label class="custom-control-label" for="ftp_pasv">Passive</label>
+                          </div>
+                          <div class="custom-control custom-switch">
+                            <input v-model="settings.ftp_ssl" type="checkbox" class="custom-control-input" id="ftp_ssl" :true-value="1" :false-value="0" />
+                            <label class="custom-control-label" for="ftp_ssl">FTPS / SSL</label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 4. WebDAV -->
+                    <div class="card mb-3 p-3" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5><i class="mdi mdi-folder-network mr-1"></i> WebDAV (Nextcloud / ownCloud / Box / Apache)</h5>
+                        <div>
+                          <button type="button" class="btn btn-sm btn-outline-info" @click="testStorage('webdav')">
+                            <i class="mdi mdi-check-circle-outline mr-1"></i> Test Connection
+                          </button>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-md-6">
+                          <div class="form-group">
+                            <label for="webdav_url">WebDAV Server URL</label>
+                            <input v-model="settings.webdav_url" id="webdav_url" type="text" class="form-control" placeholder="https://cloud.example.com/remote.php/dav/files/user/" />
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="form-group">
+                            <label for="webdav_username">Username</label>
+                            <input v-model="settings.webdav_username" id="webdav_username" type="text" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="form-group">
+                            <label for="webdav_password">Password / Token</label>
+                            <input v-model="settings.webdav_password" id="webdav_password" type="password" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="webdav_path">Subdirectory Path (optional)</label>
+                            <input v-model="settings.webdav_path" id="webdav_path" type="text" class="form-control" placeholder="videos" />
+                          </div>
+                        </div>
+                        <div class="col-md-8">
+                          <div class="form-group">
+                            <label for="webdav_public_url">Public Access Base URL</label>
+                            <input v-model="settings.webdav_public_url" id="webdav_public_url" type="text" class="form-control" placeholder="https://cloud.example.com/s/publiclink or CDN URL" />
+                            <small class="form-text text-muted">If blank, defaults to the direct WebDAV URL.</small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 5. SFTP / SCP / RSync -->
+                    <div class="card mb-3 p-3" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5><i class="mdi mdi-ssh mr-1"></i> SFTP / SCP / RSync (SSH)</h5>
+                        <div>
+                          <button type="button" class="btn btn-sm btn-outline-info" @click="testStorage('sftp')">
+                            <i class="mdi mdi-check-circle-outline mr-1"></i> Test Connection
+                          </button>
+                        </div>
+                      </div>
+                      <div class="row">
+                        <div class="col-md-3">
+                          <div class="form-group">
+                            <label for="sftp_method">Transfer Protocol</label>
+                            <select v-model="settings.sftp_method" id="sftp_method" class="form-control">
+                              <option value="sftp">SFTP</option>
+                              <option value="scp">SCP</option>
+                              <option value="rsync">RSync</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="sftp_host">Host / IP</label>
+                            <input v-model="settings.sftp_host" id="sftp_host" type="text" class="form-control" placeholder="sftp.example.com" />
+                          </div>
+                        </div>
+                        <div class="col-md-2">
+                          <div class="form-group">
+                            <label for="sftp_port">SSH Port</label>
+                            <input v-model="settings.sftp_port" id="sftp_port" type="number" class="form-control" placeholder="22" />
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="form-group">
+                            <label for="sftp_username">Username</label>
+                            <input v-model="settings.sftp_username" id="sftp_username" type="text" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="sftp_password">Password</label>
+                            <input v-model="settings.sftp_password" id="sftp_password" type="password" class="form-control" />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="sftp_path">Remote Directory / Path</label>
+                            <input v-model="settings.sftp_path" id="sftp_path" type="text" class="form-control" placeholder="/var/www/html/videos" />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-group">
+                            <label for="sftp_url">Public Access Base URL</label>
+                            <input v-model="settings.sftp_url" id="sftp_url" type="text" class="form-control" placeholder="https://cdn.example.com/videos" />
+                          </div>
+                        </div>
+                        <div class="col-md-12">
+                          <div class="form-group">
+                            <label for="sftp_key">SSH Private Key (optional, if not using password)</label>
+                            <textarea v-model="settings.sftp_key" id="sftp_key" class="form-control" rows="2" placeholder="-----BEGIN OPENSSH PRIVATE KEY----- ..."></textarea>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
-                </div>
-                </div>
+                </div></div>
 
 
 
@@ -958,6 +1183,25 @@ export default {
         this.showSuccess(response.data.message);
       } catch (error) {
         this.showError(error.response);
+      }
+    },
+
+    async testStorage(driver) {
+      try {
+        const response = await axios.post(url + "/admin/storage/test", {
+          driver: driver,
+          ...this.settings
+        });
+        if (response.data.status === 200) {
+          this.showSuccess(response.data.message);
+        } else {
+          this.showAlert(response.data.message || "Connection failed");
+        }
+      } catch (error) {
+        const msg = error.response && error.response.data && error.response.data.message
+          ? error.response.data.message
+          : "Connection test failed";
+        this.showAlert(msg);
       }
     },
   },
