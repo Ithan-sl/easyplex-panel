@@ -50,9 +50,9 @@
 
 
 
-<script src="{{ asset('js/manifest.js') }}"></script>   
-<script src="{{ asset('js/vendor.js') }}"></script>   
-    <script src="{{ asset('js/app.js') }}?v=2.3.1"></script>    
+<script src="{{ asset('js/manifest.js') }}?v={{ file_exists(public_path('js/manifest.js')) ? filemtime(public_path('js/manifest.js')) : time() }}"></script>   
+<script src="{{ asset('js/vendor.js') }}?v={{ file_exists(public_path('js/vendor.js')) ? filemtime(public_path('js/vendor.js')) : time() }}"></script>   
+    <script src="{{ asset('js/app.js') }}?v={{ file_exists(public_path('js/app.js')) ? filemtime(public_path('js/app.js')) : time() }}"></script>    
     <script src="{{ asset('js/custom.js') }}"></script>
     <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async=""></script>
 
