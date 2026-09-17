@@ -27,7 +27,7 @@ class LivetvGenre extends Model
 
     public function getNameAttribute()
     {
-        return $this->genre->name;
+        return $this->genre ? $this->genre->name : null;
     }
 
 

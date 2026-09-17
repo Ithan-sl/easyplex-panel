@@ -155,38 +155,59 @@ class LivetvController extends Controller
     {
         if (isset($request->livetv)) {
 
+            $livetvData = $request->livetv;
+
+            // Embed detection & iframe src extraction
+            $rawLink = trim($livetvData['link'] ?? '');
+            if (!empty($rawLink)) {
+                if (preg_match('/<iframe.*?src=["\'](.*?)["\']/i', $rawLink, $matches)) {
+                    $livetvData['link'] = trim($matches[1]);
+                    $livetvData['embed'] = 1;
+                } elseif (\App\Helpers\EmbedHelper::isEmbedUrl($rawLink)) {
+                    $livetvData['embed'] = 1;
+                }
+                if (strpos($livetvData['link'], '.m3u8') !== false) {
+                    $livetvData['hls'] = 1;
+                }
+            }
+
             $livetv = new Livetv();
-            $livetv->fill($request->livetv);
+            $livetv->fill($livetvData);
             $livetv->save();
 
-
-
-            if ($request->livetv['genres']) {
-                foreach ($request->livetv['genres'] as $genre) {
-
-                    $find = Category::find($genre['id']);
-                    if ($find == null) {
+            if (!empty($livetvData['genres'])) {
+                foreach ($livetvData['genres'] as $genre) {
+                    $catId = $genre['category_id'] ?? $genre['id'] ?? null;
+                    if ($catId) {
+                        $find = Category::find($catId);
+                        if ($find == null) {
+                            $find = new Category();
+                            $find->fill($genre);
+                            $find->id = $catId;
+                            $find->save();
+                        }
+                    } else {
                         $find = new Category();
                         $find->fill($genre);
                         $find->save();
                     }
-                    $movieGenre = new LivetvGenre();
-                    $movieGenre->category_id = $genre['id'];
-                    $movieGenre->livetv_id = $livetv->id;
-                    $movieGenre->save();
+
+                    $finalCatId = $find->id ?? $catId;
+                    if ($finalCatId) {
+                        $movieGenre = new LivetvGenre();
+                        $movieGenre->category_id = $finalCatId;
+                        $movieGenre->livetv_id = $livetv->id;
+                        $movieGenre->save();
+                    }
                 }
             }
 
-
-            $this->onStoreVideo($request,$livetv);
-
-
-
+            $this->onStoreVideo($request, $livetv);
 
             $data = [
                 'status' => 200,
                 'message' => 'successfully created',
-                'body' => $livetv
+                'body' => $livetv->load('genres.genre')
             ];
         } else {
             $data = [
@@ -195,16 +216,16 @@ class LivetvController extends Controller
             ];
         }
 
-        if ($request->notification) {
-            $this->dispatch(new SendNotification($livetv));
+        if (!empty($request->notification)) {
+            try {
+                $this->dispatch(new SendNotification($livetv));
+            } catch (\Throwable $e) {
+                \Log::warning('Livetv notification failed: ' . $e->getMessage());
+            }
         }
 
         return response()->json($data, $data['status']);
     }
-
-
-
-
 
     public function onStoreVideo($request,$livetv) {
 
@@ -220,30 +241,47 @@ class LivetvController extends Controller
 
     }
 
-
-
-
-
     // update a livetv in the database
     public function update(LivetvRequest $request, Livetv $livetv)
     {
         if ($livetv != null) {
 
-            $livetv->fill($request->livetv);
+            $livetvData = $request->livetv;
+
+            // Embed detection & iframe src extraction
+            $rawLink = trim($livetvData['link'] ?? '');
+            if (!empty($rawLink)) {
+                if (preg_match('/<iframe.*?src=["\'](.*?)["\']/i', $rawLink, $matches)) {
+                    $livetvData['link'] = trim($matches[1]);
+                    $livetvData['embed'] = 1;
+                } elseif (\App\Helpers\EmbedHelper::isEmbedUrl($rawLink)) {
+                    $livetvData['embed'] = 1;
+                }
+                if (strpos($livetvData['link'], '.m3u8') !== false) {
+                    $livetvData['hls'] = 1;
+                }
+            }
+
+            $livetv->fill($livetvData);
             $livetv->save();
 
-
-            if ($request->livetv['genres']) {
-                foreach ($request->livetv['genres'] as $genre) {
-                    if (!isset($genre['category_id'])) {
-                        $find = Category::find($genre['id'] ?? 0) ?? new Category();
-                        $find->fill($genre);
-                        $find->save();
-                        $movieGenre = LivetvGenre::where('livetv_id', $livetv->id)
-                            ->where('category_id', $genre['id'])->get();
-                        if (count($movieGenre) < 1) {
+            if (!empty($livetvData['genres'])) {
+                foreach ($livetvData['genres'] as $genre) {
+                    $catId = $genre['category_id'] ?? $genre['id'] ?? null;
+                    if ($catId) {
+                        $exists = LivetvGenre::where('livetv_id', $livetv->id)
+                            ->where('category_id', $catId)
+                            ->first();
+                        if (!$exists) {
+                            $find = Category::find($catId);
+                            if (!$find) {
+                                $find = new Category();
+                                $find->fill($genre);
+                                $find->id = $catId;
+                                $find->save();
+                            }
                             $movieGenre = new LivetvGenre();
-                            $movieGenre->category_id = $genre['id'];
+                            $movieGenre->category_id = $find->id ?? $catId;
                             $movieGenre->livetv_id = $livetv->id;
                             $movieGenre->save();
                         }
@@ -251,14 +289,12 @@ class LivetvController extends Controller
                 }
             }
 
-
-            $this->onUpdateVideo($request,$livetv);
-
+            $this->onUpdateVideo($request, $livetv);
 
             $data = [
                 'status' => 200,
                 'message' => 'successfully updated',
-                'body' => $livetv
+                'body' => $livetv->load('genres.genre')
             ];
         } else {
             $data = [

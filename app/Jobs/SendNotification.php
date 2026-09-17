@@ -50,11 +50,20 @@ class SendNotification implements ShouldQueue
      */
     public function handle()
     {
-        $settings = Setting::find(1);
-        $client = new Client(['headers' => ['Authorization' => "key=$settings->authorization", 'Content-Type' => 'application/json']]);
-
-
         try {
+            $settings = Setting::find(1);
+            if (!$settings || empty($settings->authorization)) {
+                return ['status' => 'skipped'];
+            }
+
+            $client = new Client([
+                'headers' => [
+                    'Authorization' => "key=$settings->authorization",
+                    'Content-Type' => 'application/json'
+                ],
+                'timeout' => 5,
+                'connect_timeout' => 3
+            ]);
             
             if ($this->data instanceof Movie) {
                 $client->post(self::FIREBASE_URL, [

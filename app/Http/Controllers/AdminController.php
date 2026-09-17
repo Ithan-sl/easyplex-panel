@@ -443,11 +443,14 @@ class AdminController extends Controller
 
     public function topSeries()
     {
-        $series = anime::all()->makeHidden(['seasons', 'genres'])->sortByDesc(self::VIEWS);
+        $series = Serie::orderBy(self::VIEWS, 'desc')->limit(10)->get();
 
-        if ($series->count() > 10) {
-            $series = $series->take(10);
-        }
+        return response()->json($series, 200);
+    }
+
+    public function topAnimes()
+    {
+        $animes = Anime::orderBy(self::VIEWS, 'desc')->limit(10)->get();
 
         return response()->json($animes, 200);
     }
@@ -464,6 +467,11 @@ class AdminController extends Controller
         $livetv = Livetv::orderBy(self::VIEWS, 'desc')->limit(10)->get();
 
         return response()->json($livetv, 200);
+    }
+
+    public function topLivetvs()
+    {
+        return $this->topLivetv();
     }
 
     public function topUsers()

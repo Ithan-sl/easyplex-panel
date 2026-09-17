@@ -94,6 +94,26 @@ Vue.component('adsComponent', require('./components/AdsComponent.vue').default);
 Vue.component('upcomingComponent', require('./components/UpcomingComponent.vue').default);
 Vue.component('plansComponent', require('./components/PlansComponent.vue').default);
 Vue.component('categoriesComponent', require('./components/CategoriesComponent.vue').default);
+Vue.component('featuredComponent', require('./components/FeaturedComponent.vue').default);
+Vue.component('featured-component', require('./components/FeaturedComponent.vue').default);
+Vue.component('languagesComponent', require('./components/LanguagesComponent.vue').default);
+Vue.component('languages-component', require('./components/LanguagesComponent.vue').default);
+Vue.component('certificationsComponent', require('./components/CertificationsComponent.vue').default);
+Vue.component('certifications-component', require('./components/CertificationsComponent.vue').default);
+Vue.component('collectionsComponent', require('./components/CollectionsComponent.vue').default);
+Vue.component('collections-component', require('./components/CollectionsComponent.vue').default);
+Vue.component('networksComponent', require('./components/NetworksComponent.vue').default);
+Vue.component('networks-component', require('./components/NetworksComponent.vue').default);
+Vue.component('castersComponent', require('./components/CastersComponent.vue').default);
+Vue.component('casters-component', require('./components/CastersComponent.vue').default);
+Vue.component('commentsComponent', require('./components/CommentsComponent.vue').default);
+Vue.component('comments-component', require('./components/CommentsComponent.vue').default);
+Vue.component('headersComponent', require('./components/HeadersComponent.vue').default);
+Vue.component('headers-component', require('./components/HeadersComponent.vue').default);
+Vue.component('suggestionsComponent', require('./components/SuggestionsComponent.vue').default);
+Vue.component('suggestions-component', require('./components/SuggestionsComponent.vue').default);
+Vue.component('previewsComponent', require('./components/PreviewsComponent.vue').default);
+Vue.component('previews-component', require('./components/PreviewsComponent.vue').default);
 
 
 /**

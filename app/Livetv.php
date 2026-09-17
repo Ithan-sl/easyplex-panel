@@ -44,11 +44,15 @@ class Livetv extends Model
     
     public function getGenresNameAttribute()
     {
-        $genres = "";
-        foreach ($this->genres as $genre) {
-            return $genre['name'];
+        $names = [];
+        if ($this->genres) {
+            foreach ($this->genres as $genre) {
+                if (!empty($genre->name)) {
+                    $names[] = $genre->name;
+                }
+            }
         }
-
+        return !empty($names) ? implode(', ', $names) : null;
     }
 
 }

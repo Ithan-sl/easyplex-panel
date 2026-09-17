@@ -25,9 +25,9 @@ class LivetvRequest extends FormRequest
     {
         return [
             'livetv.name' => 'required',
-            'livetv.poster_path' => 'nullable|URL',
-            'livetv.backdrop_path' => 'nullable|URL',
-            'livetv.link' => 'nullable|URL',
+            'livetv.poster_path' => 'nullable|string',
+            'livetv.backdrop_path' => 'nullable|string',
+            'livetv.link' => 'nullable|string',
         ];
     }
 
@@ -35,8 +35,6 @@ class LivetvRequest extends FormRequest
     {
         return [
             'livetv.name.required' => 'the name is required.',
-            'livetv.poster_path.u_r_l' => 'the poster_path must be a URL',
-            'livetv.backdrop_path.u_r_l' => 'the backdrop_path must be a URL',
         ];
     }
 }
