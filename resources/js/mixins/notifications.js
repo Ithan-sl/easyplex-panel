@@ -1,15 +1,23 @@
 export const notifications = {
     methods: {
         showError: function (value) {
-            if (typeof value === 'object' && value.status == 422) {
-                const first = Object.keys(value.data.errors)[0];
-                value = value.data.errors[first][0];
+            if (typeof value === 'object' && value !== null) {
+                if (value.status == 422 && value.data && value.data.errors) {
+                    const first = Object.keys(value.data.errors)[0];
+                    value = value.data.errors[first][0];
+                } else if (value.data && value.data.message) {
+                    value = value.data.message;
+                } else if (value.message) {
+                    value = value.message;
+                } else {
+                    value = 'An error has occurred';
+                }
             }
-            if (typeof value === 'undefined') {
+            if (typeof value === 'undefined' || !value) {
                 value = 'An error has occurred';
             }
             this.$notify({
-                message: value,
+                message: String(value),
                 type: 'error',
                 top: false,
                 bottom: true,

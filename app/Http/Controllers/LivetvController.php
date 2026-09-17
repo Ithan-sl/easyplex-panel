@@ -21,14 +21,27 @@ class LivetvController extends Controller
 
     public function show($movie)
     {
+        $streaming = Livetv::with(['videos', 'genres.genre'])->where('id', '=', $movie)->first();
+        if (!$streaming) {
+            return response()->json(['message' => 'Stream not found'], 404);
+        }
 
+        // If videos is empty but channel has a direct link, create a fallback video entry so all player types work
+        if ($streaming->videos->isEmpty() && !empty($streaming->link)) {
+            $fallbackVideo = new LivetvVideo([
+                'livetv_id' => $streaming->id,
+                'server' => 'Default',
+                'link' => $streaming->link,
+                'embed' => $streaming->embed ?? 0,
+                'hls' => $streaming->hls ?? 0,
+                'status' => 1
+            ]);
+            $streaming->setRelation('videos', collect([$fallbackVideo]));
+        }
 
-        $streaming = Livetv::with(['videos'])->where('id', '=', $movie)->first();
-
-        $streaming->increment('views',1);
+        $streaming->increment('views', 1);
         
         return response()->json($streaming, 200);
-
     }
 
 
@@ -76,23 +89,32 @@ class LivetvController extends Controller
 
     public function relateds(Livetv $movie)
     {
-        
- 
-        $genre = $movie->genres[0]->category_id;
+        if (!$movie || $movie->genres->isEmpty()) {
+            return response()->json(['relateds' => []], 200);
+        }
+
+        $firstGenre = $movie->genres->first();
+        $genre = $firstGenre ? $firstGenre->category_id : null;
+        if (!$genre) {
+            return response()->json(['relateds' => []], 200);
+        }
+
         $movies = LivetvGenre::where('category_id', $genre)->where('livetv_id', '!=', $movie->id)
             ->limit(6)
             ->get();
         $movies->load('livetv')->where('active', '=', 1);
         $relateds = [];
         foreach ($movies as $item) {
-            array_push($relateds, $item['livetv']);
+            if (!empty($item['livetv'])) {
+                array_push($relateds, $item['livetv']);
+            }
         }
 
         $relateds = array_filter($relateds, function ($item) {
             return !is_null($item);
         });
 
-        return response()->json(['relateds' => $relateds], 200);
+        return response()->json(['relateds' => array_values($relateds)], 200);
     }
 
 
@@ -157,6 +179,14 @@ class LivetvController extends Controller
 
             $livetvData = $request->livetv;
 
+            // Fallback for BackDrop / Poster if user leaves one blank
+            if (empty($livetvData['backdrop_path']) && !empty($livetvData['poster_path'])) {
+                $livetvData['backdrop_path'] = $livetvData['poster_path'];
+            }
+            if (empty($livetvData['poster_path']) && !empty($livetvData['backdrop_path'])) {
+                $livetvData['poster_path'] = $livetvData['backdrop_path'];
+            }
+
             // Embed detection & iframe src extraction
             $rawLink = trim($livetvData['link'] ?? '');
             if (!empty($rawLink)) {
@@ -204,10 +234,22 @@ class LivetvController extends Controller
 
             $this->onStoreVideo($request, $livetv);
 
+            // Always ensure video record exists in livetv_videos for multi-server compatibility
+            if (!empty($livetvData['link']) && LivetvVideo::where('livetv_id', $livetv->id)->count() === 0) {
+                $video = new LivetvVideo();
+                $video->livetv_id = $livetv->id;
+                $video->server = 'Default';
+                $video->link = $livetvData['link'];
+                $video->embed = $livetvData['embed'] ?? 0;
+                $video->hls = $livetvData['hls'] ?? 0;
+                $video->status = 1;
+                $video->save();
+            }
+
             $data = [
                 'status' => 200,
                 'message' => 'successfully created',
-                'body' => $livetv->load('genres.genre')
+                'body' => $livetv->load('genres.genre', 'videos')
             ];
         } else {
             $data = [
@@ -247,6 +289,14 @@ class LivetvController extends Controller
         if ($livetv != null) {
 
             $livetvData = $request->livetv;
+
+            // Fallback for BackDrop / Poster if user leaves one blank
+            if (empty($livetvData['backdrop_path']) && !empty($livetvData['poster_path'])) {
+                $livetvData['backdrop_path'] = $livetvData['poster_path'];
+            }
+            if (empty($livetvData['poster_path']) && !empty($livetvData['backdrop_path'])) {
+                $livetvData['poster_path'] = $livetvData['backdrop_path'];
+            }
 
             // Embed detection & iframe src extraction
             $rawLink = trim($livetvData['link'] ?? '');
@@ -291,10 +341,30 @@ class LivetvController extends Controller
 
             $this->onUpdateVideo($request, $livetv);
 
+            // Keep default video in livetv_videos in sync
+            if (!empty($livetvData['link'])) {
+                $existingVideo = LivetvVideo::where('livetv_id', $livetv->id)->first();
+                if ($existingVideo) {
+                    $existingVideo->link = $livetvData['link'];
+                    $existingVideo->embed = $livetvData['embed'] ?? 0;
+                    $existingVideo->hls = $livetvData['hls'] ?? 0;
+                    $existingVideo->save();
+                } else {
+                    $video = new LivetvVideo();
+                    $video->livetv_id = $livetv->id;
+                    $video->server = 'Default';
+                    $video->link = $livetvData['link'];
+                    $video->embed = $livetvData['embed'] ?? 0;
+                    $video->hls = $livetvData['hls'] ?? 0;
+                    $video->status = 1;
+                    $video->save();
+                }
+            }
+
             $data = [
                 'status' => 200,
                 'message' => 'successfully updated',
-                'body' => $livetv->load('genres.genre')
+                'body' => $livetv->load('genres.genre', 'videos')
             ];
         } else {
             $data = [

@@ -212,44 +212,65 @@
             <div class="row">
               <div class="col-md-12">
                 <div class="form-group">
-                  <label for="title">BackDrop Path</label>
+                  <label for="backdrop_path">BackDrop Path (Imagem de Fundo / Banner Panorâmico 16:9)</label>
                   <input
                     class="form-control"
                     id="backdrop_path"
                     name="backdrop_path"
-                    placeholder="Backdrop Image"
-                    required
+                    placeholder="URL da Imagem de Fundo (ou faça upload abaixo)"
                     type="text"
                     v-model="form.livetv.backdrop_path"
                   />
-                     <img
-                    :src="form.livetv.poster_path"
-                    alt="poster path"
-                    class="back_poster"
-                    data-loaded="true"
-                    height="316"
-                    v-if="form.livetv.poster_path"
-                    width="210"
-                  />
+                  <div class="mt-2" v-if="form.livetv.backdrop_path">
+                    <img
+                      :src="form.livetv.backdrop_path"
+                      alt="Backdrop Preview"
+                      style="max-height: 160px; max-width: 320px; object-fit: cover; border-radius: 6px; border: 1px solid #444;"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
+            <div class="row">
+              <div class="col-md-12">
+                <div class="form-group">
+                  <label>BackDrop Upload (Upload da Imagem de Fundo)</label>
+                  <div class="input-group col-xs-12">
+                    <input
+                      @change="storeBackdrop"
+                      class="form-control file-upload-info"
+                      id="backdrop"
+                      placeholder="Upload Imagem de Fundo"
+                      type="file"
+                    />
+                    <span class="input-group-append">
+                      <button class="file-upload-browse btn btn-primary" type="button">Upload</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div class="row">
               <div class="col-md-12">
                 <div class="form-group">
-                  <label for="poster_path">Poster Path</label>
+                  <label for="poster_path">Poster Path (Capa Vertical / Logo do Canal)</label>
                   <input
                     class="form-control"
                     id="poster_path"
                     name="poster_path"
-                    placeholder="Poster Image Link or Upload"
-                    required
+                    placeholder="URL do Poster / Logo (ou faça upload abaixo)"
                     type="text"
                     v-model="form.livetv.poster_path"
                   />
-
+                  <div class="mt-2" v-if="form.livetv.poster_path">
+                    <img
+                      :src="form.livetv.poster_path"
+                      alt="Poster Preview"
+                      style="max-height: 160px; max-width: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #444;"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -257,14 +278,13 @@
             <div class="row">
               <div class="col-md-12">
                 <div class="form-group">
-                  <label>Poster Upload</label>
-                  <input class="file-upload-default" />
+                  <label>Poster Upload (Upload da Capa / Logo)</label>
                   <div class="input-group col-xs-12">
                     <input
                       @change="storePoster"
                       class="form-control file-upload-info"
                       id="poster"
-                      placeholder="Upload Image"
+                      placeholder="Upload Imagem Poster"
                       type="file"
                     />
                     <span class="input-group-append">
