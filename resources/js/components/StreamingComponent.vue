@@ -368,12 +368,10 @@ export default {
   },
   async mounted() {
     let response = await axios.get(url + "/admin/livetv/data");
-    this.livetvs = response.data;
+    this.livetvs = Array.isArray(response.data) ? response.data : (response.data.data || []);
 
     response = await axios.get(url + "/admin/categories/data");
-    this.options = response.data;
-
-
+    this.options = Array.isArray(response.data) ? response.data : (response.data.data || []);
   },
   methods: {
     create() {
@@ -523,8 +521,11 @@ export default {
   computed: {
     // returns the livetv array filtered by the search
     filteredLivetvs() {
+      if (!Array.isArray(this.livetvs)) {
+        return [];
+      }
       return this.livetvs.filter((livetv) => {
-        return livetv.name.toLowerCase().match(this.search.toLowerCase());
+        return (livetv && livetv.name ? livetv.name : "").toLowerCase().match(this.search.toLowerCase());
       });
     },
   },

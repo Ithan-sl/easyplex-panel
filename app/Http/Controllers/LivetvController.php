@@ -167,9 +167,7 @@ class LivetvController extends Controller
     // returns all livetv for admin panel
     public function data()
     {
-
-        return response()->json(Livetv::with(['videos'])->orderByDesc('created_at')
-        ->paginate(6), 200);
+        return response()->json(Livetv::with(['videos', 'genres.genre'])->orderByDesc('created_at')->get(), 200);
     }
 
     // create a new livetv in the database
