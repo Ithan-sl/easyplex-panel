@@ -10,7 +10,7 @@ use BeyondCode\Comments\Traits\HasComments;
 
 class Episode extends Model
 {
-    protected $fillable = ['tmdb_id', 'episode_number', 'name', 'overview', 'still_path', 'still_path_tv', 'vote_average', 'vote_count',
+    protected $fillable = ['season_id', 'tmdb_id', 'episode_number', 'name', 'overview', 'still_path', 'still_path_tv', 'vote_average', 'vote_count',
      'air_date','hasrecap','skiprecap_start_in','free','enable_stream','enable_media_download','enable_ads_unlock'];
 
 

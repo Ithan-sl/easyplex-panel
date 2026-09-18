@@ -114,6 +114,8 @@ Vue.component('suggestionsComponent', require('./components/SuggestionsComponent
 Vue.component('suggestions-component', require('./components/SuggestionsComponent.vue').default);
 Vue.component('previewsComponent', require('./components/PreviewsComponent.vue').default);
 Vue.component('previews-component', require('./components/PreviewsComponent.vue').default);
+Vue.component('megaembedComponent', require('./components/MegaEmbedComponent.vue').default);
+Vue.component('megaembed-component', require('./components/MegaEmbedComponent.vue').default);
 
 
 /**

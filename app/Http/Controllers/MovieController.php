@@ -110,9 +110,30 @@ class MovieController extends Controller
             ->with(['genres.genre' => function ($query) {
                 $query->select('id', 'name');
             }])
-            ->where('id', '=', $id)->first()->makeHidden(['casters', 'networks']);
+            ->where('id', '=', $id)->first();
 
-        $movie->increment('views');
+        if ($movie) {
+            if ($movie->videos->isEmpty() && !empty($movie->tmdb_id)) {
+                $dublado = new MovieVideo([
+                    'movie_id' => $movie->id,
+                    'server' => 'MegaEmbed (Dublado)',
+                    'link' => 'https://mgeb.top/embed/' . $movie->tmdb_id,
+                    'lang' => 'Português',
+                    'embed' => 1,
+                    'status' => 1,
+                ]);
+                $legendado = new MovieVideo([
+                    'movie_id' => $movie->id,
+                    'server' => 'MegaEmbed (Legendado)',
+                    'link' => 'https://nhdapi.com/embed/movie/' . $movie->tmdb_id,
+                    'lang' => 'Legendado',
+                    'embed' => 1,
+                    'status' => 1,
+                ]);
+                $movie->setRelation('videos', collect([$dublado, $legendado]));
+            }
+            $movie->increment('views');
+        }
 
         return response()->json($movie);
 
@@ -2271,6 +2292,25 @@ class MovieController extends Controller
     // return all the videos of a movie
     public function videos(Movie $movie)
     {
+        if ($movie && $movie->videos->isEmpty() && !empty($movie->tmdb_id)) {
+            $dublado = new MovieVideo([
+                'movie_id' => $movie->id,
+                'server' => 'MegaEmbed (Dublado)',
+                'link' => 'https://mgeb.top/embed/' . $movie->tmdb_id,
+                'lang' => 'Português',
+                'embed' => 1,
+                'status' => 1,
+            ]);
+            $legendado = new MovieVideo([
+                'movie_id' => $movie->id,
+                'server' => 'MegaEmbed (Legendado)',
+                'link' => 'https://nhdapi.com/embed/movie/' . $movie->tmdb_id,
+                'lang' => 'Legendado',
+                'embed' => 1,
+                'status' => 1,
+            ]);
+            return response()->json([$dublado, $legendado], 200);
+        }
         return response()->json($movie->videos, 200);
     }
 

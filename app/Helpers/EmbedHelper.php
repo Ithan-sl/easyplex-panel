@@ -50,7 +50,8 @@ class EmbedHelper
             'vidsrc', 'vidmoly', 'voe.sx', 'upstream.to', 'ok.ru/videoembed',
             'youtube.com/embed', 'youtu.be', 'vidhide', 'streamwish',
             'mp4upload', 'uqload', 'luluvdo', 'dropload', 'hexupload',
-            'embedgram', 'netu.tv', 'waaw.tv', 'wolfstream'
+            'embedgram', 'netu.tv', 'waaw.tv', 'wolfstream',
+            'mgeb.top', 'megaembed', 'nhdapi.com'
         ];
 
         foreach ($embedPatterns as $pattern) {
@@ -92,7 +93,8 @@ class EmbedHelper
             'vidsrc', 'vidmoly', 'voe.sx', 'upstream.to', 'ok.ru/videoembed',
             'youtube.com/embed', 'youtu.be', 'vidhide', 'streamwish',
             'mp4upload', 'uqload', 'luluvdo', 'dropload', 'hexupload',
-            'embedgram', 'netu.tv', 'waaw.tv', 'wolfstream'
+            'embedgram', 'netu.tv', 'waaw.tv', 'wolfstream',
+            'mgeb.top', 'megaembed', 'nhdapi.com'
         ];
 
         foreach ($embedPatterns as $pattern) {

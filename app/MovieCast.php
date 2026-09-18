@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MovieCast extends Model
 {
+    protected $fillable = ['movie_id', 'cast_id'];
     protected $appends = ['name'];
 
 

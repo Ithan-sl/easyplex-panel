@@ -8,6 +8,7 @@ class MovieGenre extends Model
 {
 
 
+    protected $fillable = ['movie_id', 'genre_id'];
    protected $appends = ['name'];
 
    protected $hidden = [

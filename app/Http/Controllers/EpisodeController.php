@@ -176,13 +176,31 @@ class EpisodeController extends Controller
     // return videos for an episode
     public function videos($episode)
     {
-        
-
         $model = Episode::where('id', $episode)->firstOrFail();
 
+        if ($model->videos->isEmpty()) {
+            $season = $model->season;
+            $serie = $season ? $season->serie : null;
+            if ($serie && !empty($serie->tmdb_id) && $season && $season->season_number && $model->episode_number) {
+                $dublado = new SerieVideo([
+                    'episode_id' => $model->id,
+                    'server' => 'MegaEmbed (Dublado)',
+                    'link' => 'https://mgeb.top/embed/' . $serie->tmdb_id . '/' . $season->season_number . '/' . $model->episode_number,
+                    'lang' => 'Português',
+                    'embed' => 1,
+                ]);
+                $legendado = new SerieVideo([
+                    'episode_id' => $model->id,
+                    'server' => 'MegaEmbed (Legendado)',
+                    'link' => 'https://nhdapi.com/embed/tv/' . $serie->tmdb_id . '/' . $season->season_number . '/' . $model->episode_number,
+                    'lang' => 'Legendado',
+                    'embed' => 1,
+                ]);
+                return response()->json(['episode_stream' => [$dublado, $legendado]], 200);
+            }
+        }
 
         return response()->json(['episode_stream' => $model->videos], 200);
-
     }
 
 

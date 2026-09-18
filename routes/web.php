@@ -74,6 +74,13 @@ Route::group(['prefix' => 'admin', 'middleware' => 'admin'], function () {
     Route::get('/languages', 'AdminController@languages')->name('admin.languages');
     Route::get('/collections', 'AdminController@collections')->name('admin.collections');
 
+    // MegaEmbed Auto-Importer
+    Route::get('/megaembed', 'MegaEmbedController@index')->name('admin.megaembed');
+    Route::get('/megaembed/stats', 'MegaEmbedController@stats')->name('admin.megaembed.stats');
+    Route::get('/megaembed/search', 'MegaEmbedController@search')->name('admin.megaembed.search');
+    Route::post('/megaembed/import-single', 'MegaEmbedController@importSingle')->name('admin.megaembed.import_single');
+    Route::post('/megaembed/import-batch', 'MegaEmbedController@importBatch')->name('admin.megaembed.import_batch');
+
 
     Route::get('/moviesCount', 'AdminController@moviesCount');
     Route::get('/moviesInactiveCount', 'AdminController@moviesInactiveCount');

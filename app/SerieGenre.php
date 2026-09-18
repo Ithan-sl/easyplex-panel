@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class SerieGenre extends Model
 {
+    protected $fillable = ['serie_id', 'genre_id'];
     protected $appends = ['name'];
 
 

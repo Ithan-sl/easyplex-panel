@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class SerieCast extends Model
 {
+    protected $fillable = ['serie_id', 'cast_id'];
     protected $appends = ['name'];
 
     protected $hidden = [

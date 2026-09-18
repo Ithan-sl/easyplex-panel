@@ -108,6 +108,13 @@ $settings = \App\Setting::first();
                 </a>
             </li>
 
+            <li class="nav-item">
+                <a class="nav-link" href="{{route('admin.megaembed')}}">
+                    <i class="mdi mdi-cloud-download menu-icon text-success"></i>
+                    <span class="menu-title font-weight-bold text-success">MegaEmbed Import</span>
+                </a>
+            </li>
+
 
             <li class="nav-item">
                 <a class="nav-link" href="{{route('admin.animes')}}">
