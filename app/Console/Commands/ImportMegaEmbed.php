@@ -18,6 +18,7 @@ class ImportMegaEmbed extends Command
                             {--offset=0 : Offset index to start from}
                             {--id= : Specific TMDb ID to import}
                             {--overwrite : Overwrite existing records}
+                            {--refresh : Refresh and replace streams of existing DB items with direct MegaEmbed sources}
                             {--delay=1 : Seconds to wait between items to prevent rate-limiting}';
 
     /**
@@ -40,11 +41,20 @@ class ImportMegaEmbed extends Command
         $offset = (int) $this->option('offset');
         $specificId = $this->option('id');
         $overwrite = (bool) $this->option('overwrite');
+        $refresh = (bool) $this->option('refresh');
         $delay = (int) $this->option('delay');
 
         $this->info("==================================================");
         $this->info("    MegaEmbed & TheMovieDB Auto-Importer (pt-BR)  ");
         $this->info("==================================================");
+
+        // Refresh existing records with direct sources
+        if ($refresh) {
+            $this->info("Atualizando streams existentes para fontes diretas (MP4/HLS)...");
+            $res = $service->refreshAllExistingStreams($type);
+            $this->info("✔ Sucesso! Filmes atualizados: {$res['movies']}, Episódios atualizados: {$res['episodes']}");
+            return 0;
+        }
 
         // Single ID import
         if ($specificId) {

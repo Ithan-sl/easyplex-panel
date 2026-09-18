@@ -113,24 +113,16 @@ class MovieController extends Controller
             ->where('id', '=', $id)->first();
 
         if ($movie) {
-            if ($movie->videos->isEmpty() && !empty($movie->tmdb_id)) {
-                $dublado = new MovieVideo([
-                    'movie_id' => $movie->id,
-                    'server' => 'MegaEmbed (Dublado)',
-                    'link' => 'https://mgeb.top/embed/' . $movie->tmdb_id,
-                    'lang' => 'Português',
-                    'embed' => 1,
-                    'status' => 1,
-                ]);
-                $legendado = new MovieVideo([
-                    'movie_id' => $movie->id,
-                    'server' => 'MegaEmbed (Legendado)',
-                    'link' => 'https://nhdapi.com/embed/movie/' . $movie->tmdb_id,
-                    'lang' => 'Legendado',
-                    'embed' => 1,
-                    'status' => 1,
-                ]);
-                $movie->setRelation('videos', collect([$dublado, $legendado]));
+            $hasOnlyGeneric = $movie->videos->isEmpty() || $movie->videos->every(function ($v) {
+                return strpos($v->link, 'mgeb.top') !== false;
+            });
+            if ($hasOnlyGeneric && !empty($movie->tmdb_id)) {
+                try {
+                    app(\App\Services\MegaEmbedService::class)->attachMovieStreams($movie, $movie->tmdb_id);
+                    $movie->load('videos');
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("MovieController@show attachMovieStreams error: " . $e->getMessage());
+                }
             }
             $movie->increment('views');
         }
@@ -2292,26 +2284,21 @@ class MovieController extends Controller
     // return all the videos of a movie
     public function videos(Movie $movie)
     {
-        if ($movie && $movie->videos->isEmpty() && !empty($movie->tmdb_id)) {
-            $dublado = new MovieVideo([
-                'movie_id' => $movie->id,
-                'server' => 'MegaEmbed (Dublado)',
-                'link' => 'https://mgeb.top/embed/' . $movie->tmdb_id,
-                'lang' => 'Português',
-                'embed' => 1,
-                'status' => 1,
-            ]);
-            $legendado = new MovieVideo([
-                'movie_id' => $movie->id,
-                'server' => 'MegaEmbed (Legendado)',
-                'link' => 'https://nhdapi.com/embed/movie/' . $movie->tmdb_id,
-                'lang' => 'Legendado',
-                'embed' => 1,
-                'status' => 1,
-            ]);
-            return response()->json([$dublado, $legendado], 200);
+        if ($movie) {
+            $hasOnlyGeneric = $movie->videos->isEmpty() || $movie->videos->every(function ($v) {
+                return strpos($v->link, 'mgeb.top') !== false;
+            });
+            if ($hasOnlyGeneric && !empty($movie->tmdb_id)) {
+                try {
+                    app(\App\Services\MegaEmbedService::class)->attachMovieStreams($movie, $movie->tmdb_id);
+                    $movie->load('videos');
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("MovieController@videos attachMovieStreams error: " . $e->getMessage());
+                }
+            }
+            return response()->json($movie->videos, 200);
         }
-        return response()->json($movie->videos, 200);
+        return response()->json([], 200);
     }
 
     // return all the Downlaods of a movie

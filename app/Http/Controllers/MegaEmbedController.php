@@ -11,7 +11,6 @@ class MegaEmbedController extends Controller
 
     public function __construct(MegaEmbedService $service)
     {
-        $this->middleware('auth:web');
         $this->service = $service;
     }
 

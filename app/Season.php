@@ -15,9 +15,10 @@ class Season extends Model
     public function episodes(): HasMany
     {
         return $this->hasMany(Episode::class)->orderBy('episode_number');
-
     }
 
-
-
+    public function serie(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Serie::class, 'serie_id');
+    }
 }

@@ -178,25 +178,25 @@ class EpisodeController extends Controller
     {
         $model = Episode::where('id', $episode)->firstOrFail();
 
-        if ($model->videos->isEmpty()) {
+        $hasOnlyGeneric = $model->videos->isEmpty() || $model->videos->every(function ($v) {
+            return strpos($v->link, 'mgeb.top') !== false;
+        });
+
+        if ($hasOnlyGeneric) {
             $season = $model->season;
             $serie = $season ? $season->serie : null;
             if ($serie && !empty($serie->tmdb_id) && $season && $season->season_number && $model->episode_number) {
-                $dublado = new SerieVideo([
-                    'episode_id' => $model->id,
-                    'server' => 'MegaEmbed (Dublado)',
-                    'link' => 'https://mgeb.top/embed/' . $serie->tmdb_id . '/' . $season->season_number . '/' . $model->episode_number,
-                    'lang' => 'Português',
-                    'embed' => 1,
-                ]);
-                $legendado = new SerieVideo([
-                    'episode_id' => $model->id,
-                    'server' => 'MegaEmbed (Legendado)',
-                    'link' => 'https://nhdapi.com/embed/tv/' . $serie->tmdb_id . '/' . $season->season_number . '/' . $model->episode_number,
-                    'lang' => 'Legendado',
-                    'embed' => 1,
-                ]);
-                return response()->json(['episode_stream' => [$dublado, $legendado]], 200);
+                try {
+                    app(\App\Services\MegaEmbedService::class)->attachEpisodeStreams(
+                        $model,
+                        $serie->tmdb_id,
+                        $season->season_number,
+                        $model->episode_number
+                    );
+                    $model->load('videos');
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("EpisodeController@videos attachEpisodeStreams error: " . $e->getMessage());
+                }
             }
         }
 

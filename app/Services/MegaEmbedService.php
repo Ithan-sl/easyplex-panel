@@ -347,23 +347,100 @@ class MegaEmbedService
     }
 
     /**
+     * Extract the real direct video sources (MP4, HLS m3u8, or iframe)
+     * returned by the MegaEmbed player page.
+     */
+    public function extractDirectSources($tmdbId, $seasonNumber = null, $episodeNumber = null)
+    {
+        $path = ($seasonNumber !== null && $episodeNumber !== null)
+            ? "/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
+            : "/embed/{$tmdbId}";
+
+        $domains = [
+            'https://mgeb.top',
+            'https://megaembed.com',
+            'https://embedplayer2.xyz'
+        ];
+
+        foreach ($domains as $domain) {
+            try {
+                $url = $domain . $path;
+                $response = $this->client->get($url, [
+                    'headers' => [
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    ],
+                    'timeout' => 8,
+                    'allow_redirects' => true,
+                ]);
+                $html = $response->getBody()->getContents();
+
+                if (preg_match('/var\s+sources\s*=\s*(\[.*?\]);/s', $html, $matches)) {
+                    $sources = json_decode($matches[1], true);
+                    if (is_array($sources) && count($sources) > 0) {
+                        return $sources;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning("MegaEmbedService::extractDirectSources warning for {$domain}{$path}: " . $e->getMessage());
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * Attach MegaEmbed Dublado and Legendado streams to a movie.
      */
-    protected function attachMovieStreams($movie, $tmdbId)
+    public function attachMovieStreams($movie, $tmdbId)
     {
-        // 1. Dublado (Padrão)
-        MovieVideo::updateOrCreate(
-            [
-                'movie_id' => $movie->id,
-                'link' => "https://mgeb.top/embed/{$tmdbId}"
-            ],
-            [
-                'server' => 'MegaEmbed (Dublado)',
-                'lang' => 'Português',
-                'embed' => 1,
-                'status' => 1,
-            ]
-        );
+        // 1. Extrair fontes diretas da request do MegaEmbed
+        $directSources = $this->extractDirectSources($tmdbId);
+        if (!empty($directSources)) {
+            // Remover links antigos genéricos do mgeb.top
+            MovieVideo::where('movie_id', $movie->id)
+                ->where('server', 'MegaEmbed (Dublado)')
+                ->where('link', 'like', '%mgeb.top%')
+                ->delete();
+
+            foreach ($directSources as $index => $source) {
+                $file = trim($source['file'] ?? '');
+                if (empty($file)) continue;
+
+                $type = strtolower($source['type'] ?? '');
+                $label = $source['label'] ?? ('Opção ' . ($index + 1));
+                $isHls = ($type === 'hls' || strpos($file, '.m3u8') !== false) ? 1 : 0;
+                $isEmbed = ($type === 'iframe' || \App\Helpers\EmbedHelper::isEmbedUrl($file)) ? 1 : 0;
+
+                MovieVideo::updateOrCreate(
+                    [
+                        'movie_id' => $movie->id,
+                        'link' => $file
+                    ],
+                    [
+                        'server' => "MegaEmbed ({$label})",
+                        'lang' => 'Português',
+                        'hls' => $isHls,
+                        'embed' => $isEmbed,
+                        'status' => 1,
+                    ]
+                );
+            }
+        } else {
+            // Fallback para player Web apenas se a extração direta falhar
+            MovieVideo::updateOrCreate(
+                [
+                    'movie_id' => $movie->id,
+                    'link' => "https://mgeb.top/embed/{$tmdbId}"
+                ],
+                [
+                    'server' => 'MegaEmbed (Player Web)',
+                    'lang' => 'Português',
+                    'embed' => 1,
+                    'status' => 1,
+                ]
+            );
+        }
 
         // 2. Legendado (Opcional / NHDAPI)
         MovieVideo::updateOrCreate(
@@ -501,31 +578,7 @@ class MegaEmbedService
                         );
 
                         // Attach MegaEmbed episode streams
-                        // Dublado (Padrão)
-                        SerieVideo::updateOrCreate(
-                            [
-                                'episode_id' => $episode->id,
-                                'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$epNumber}"
-                            ],
-                            [
-                                'server' => 'MegaEmbed (Dublado)',
-                                'lang' => 'Português',
-                                'embed' => 1,
-                            ]
-                        );
-
-                        // Legendado
-                        SerieVideo::updateOrCreate(
-                            [
-                                'episode_id' => $episode->id,
-                                'link' => "https://nhdapi.com/embed/tv/{$tmdbId}/{$seasonNumber}/{$epNumber}"
-                            ],
-                            [
-                                'server' => 'MegaEmbed (Legendado)',
-                                'lang' => 'Legendado',
-                                'embed' => 1,
-                            ]
-                        );
+                        $this->attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $epNumber);
 
                         $totalEpisodesImported++;
                     }
@@ -542,4 +595,105 @@ class MegaEmbedService
             'message' => "Série '{$serie->name}' importada com {$totalEpisodesImported} episódios."
         ];
     }
+
+    /**
+     * Attach direct video sources to a series episode.
+     */
+    public function attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
+    {
+        // 1. Extrair fontes diretas da request do MegaEmbed
+        $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
+        if (!empty($directSources)) {
+            // Remover links antigos genéricos do mgeb.top
+            SerieVideo::where('episode_id', $episode->id)
+                ->where('server', 'MegaEmbed (Dublado)')
+                ->where('link', 'like', '%mgeb.top%')
+                ->delete();
+
+            foreach ($directSources as $index => $source) {
+                $file = trim($source['file'] ?? '');
+                if (empty($file)) continue;
+
+                $type = strtolower($source['type'] ?? '');
+                $label = $source['label'] ?? ('Opção ' . ($index + 1));
+                $isHls = ($type === 'hls' || strpos($file, '.m3u8') !== false) ? 1 : 0;
+                $isEmbed = ($type === 'iframe' || \App\Helpers\EmbedHelper::isEmbedUrl($file)) ? 1 : 0;
+
+                SerieVideo::updateOrCreate(
+                    [
+                        'episode_id' => $episode->id,
+                        'link' => $file
+                    ],
+                    [
+                        'server' => "MegaEmbed ({$label})",
+                        'lang' => 'Português',
+                        'hls' => $isHls,
+                        'embed' => $isEmbed,
+                    ]
+                );
+            }
+        } else {
+            // Fallback para player Web apenas se a extração direta falhar
+            SerieVideo::updateOrCreate(
+                [
+                    'episode_id' => $episode->id,
+                    'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
+                ],
+                [
+                    'server' => 'MegaEmbed (Player Web)',
+                    'lang' => 'Português',
+                    'embed' => 1,
+                ]
+            );
+        }
+
+        // 2. Legendado (Opcional / NHDAPI)
+        SerieVideo::updateOrCreate(
+            [
+                'episode_id' => $episode->id,
+                'link' => "https://nhdapi.com/embed/tv/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
+            ],
+            [
+                'server' => 'MegaEmbed (Legendado)',
+                'lang' => 'Legendado',
+                'embed' => 1,
+            ]
+        );
+    }
+
+    /**
+     * Refresh streams for all movies and episodes that have TMDb IDs.
+     */
+    public function refreshAllExistingStreams($type = 'all')
+    {
+        $updated = ['movies' => 0, 'episodes' => 0];
+
+        if ($type === 'movie' || $type === 'all') {
+            $movies = Movie::whereNotNull('tmdb_id')->get();
+            foreach ($movies as $movie) {
+                $this->attachMovieStreams($movie, $movie->tmdb_id);
+                $updated['movies']++;
+            }
+        }
+
+        if ($type === 'series' || $type === 'all') {
+            $episodes = Episode::with('season.serie')
+                ->whereHas('season.serie', function ($q) {
+                    $q->whereNotNull('tmdb_id');
+                })
+                ->get();
+
+            foreach ($episodes as $episode) {
+                $season = $episode->season;
+                $serie = $season ? $season->serie : null;
+                if ($serie && $serie->tmdb_id && $season->season_number && $episode->episode_number) {
+                    $this->attachEpisodeStreams($episode, $serie->tmdb_id, $season->season_number, $episode->episode_number);
+                    $updated['episodes']++;
+                }
+            }
+        }
+
+        return $updated;
+    }
 }
+
