@@ -178,11 +178,11 @@ class EpisodeController extends Controller
     {
         $model = Episode::where('id', $episode)->firstOrFail();
 
-        $hasOnlyGeneric = $model->videos->isEmpty() || $model->videos->every(function ($v) {
-            return strpos($v->link, 'mgeb.top') !== false;
-        });
+        $hasInvalidOrGeneric = $model->videos->isEmpty()
+            || $model->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
+            || $model->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false; });
 
-        if ($hasOnlyGeneric) {
+        if ($hasInvalidOrGeneric) {
             $season = $model->season;
             $serie = $season ? $season->serie : null;
             if ($serie && !empty($serie->tmdb_id) && $season && $season->season_number && $model->episode_number) {
@@ -200,7 +200,12 @@ class EpisodeController extends Controller
             }
         }
 
-        return response()->json(['episode_stream' => $model->videos], 200);
+        $sorted = $model->videos->sortBy([
+            ['embed', 'asc'],
+            ['id', 'asc']
+        ])->values();
+
+        return response()->json(['episode_stream' => $sorted], 200);
     }
 
 
@@ -212,11 +217,11 @@ class EpisodeController extends Controller
             return response()->json(['episode_stream' => []], 200);
         }
 
-        $hasOnlyGeneric = $model->videos->isEmpty() || $model->videos->every(function ($v) {
-            return strpos($v->link, 'mgeb.top') !== false;
-        });
+        $hasInvalidOrGeneric = $model->videos->isEmpty()
+            || $model->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
+            || $model->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false; });
 
-        if ($hasOnlyGeneric) {
+        if ($hasInvalidOrGeneric) {
             $season = $model->season;
             $anime = $season ? $season->anime : null;
             if ($anime && !empty($anime->tmdb_id) && $season && $season->season_number && $model->episode_number) {
@@ -234,7 +239,12 @@ class EpisodeController extends Controller
             }
         }
 
-        return response()->json(['episode_stream' => $model->videos], 200);
+        $sorted = $model->videos->sortBy([
+            ['embed', 'asc'],
+            ['id', 'asc']
+        ])->values();
+
+        return response()->json(['episode_stream' => $sorted], 200);
     }
 
 

@@ -2285,9 +2285,10 @@ class MovieController extends Controller
     public function videos(Movie $movie)
     {
         if ($movie) {
-            $hasOnlyGeneric = $movie->videos->isEmpty() || $movie->videos->every(function ($v) {
-                return strpos($v->link, 'mgeb.top') !== false;
-            });
+            $hasOnlyGeneric = $movie->videos->isEmpty()
+                || $movie->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
+                || $movie->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false; });
+
             if ($hasOnlyGeneric && !empty($movie->tmdb_id)) {
                 try {
                     app(\App\Services\MegaEmbedService::class)->attachMovieStreams($movie, $movie->tmdb_id);
@@ -2296,7 +2297,13 @@ class MovieController extends Controller
                     \Illuminate\Support\Facades\Log::warning("MovieController@videos attachMovieStreams error: " . $e->getMessage());
                 }
             }
-            return response()->json($movie->videos, 200);
+
+            $sorted = $movie->videos->sortBy([
+                ['embed', 'asc'],
+                ['id', 'asc']
+            ])->values();
+
+            return response()->json($sorted, 200);
         }
         return response()->json([], 200);
     }

@@ -422,9 +422,8 @@ class MegaEmbedService
             : "/embed/{$tmdbId}";
 
         $domains = [
-            'https://mgeb.top',
             'https://megaembed.com',
-            'https://embedplayer2.xyz'
+            'https://mgeb.top'
         ];
 
         foreach ($domains as $domain) {
@@ -455,71 +454,109 @@ class MegaEmbedService
     }
 
     /**
-     * Attach MegaEmbed Dublado and Legendado streams to a movie.
+     * Normalize and sort sources so direct streams (MP4 / HLS, embed = 0) ALWAYS come first.
+     */
+    public function sortSourcesDirectFirst(array $sources): array
+    {
+        $normalized = [];
+
+        foreach ($sources as $index => $source) {
+            $file = '';
+            $label = '';
+            $type = '';
+
+            if (is_string($source)) {
+                $file = trim($source);
+                $label = 'Opção ' . ($index + 1);
+            } elseif (is_array($source)) {
+                $file = trim($source['file'] ?? $source['url'] ?? '');
+                $label = $source['label'] ?? ('Opção ' . ($index + 1));
+                $type = strtolower($source['type'] ?? '');
+            }
+
+            if (empty($file) || strpos($file, '******') !== false) {
+                continue;
+            }
+
+            $isHls = ($type === 'hls' || strpos(strtolower($file), '.m3u8') !== false) ? 1 : 0;
+            $isDirect = ($type === 'mp4' || $type === 'hls' || strpos(strtolower($file), '.mp4') !== false || strpos(strtolower($file), '.m3u8') !== false || !\App\Helpers\EmbedHelper::isEmbedUrl($file));
+            $isEmbed = ($isDirect && $type !== 'iframe') ? 0 : 1;
+
+            $normalized[] = [
+                'file' => $file,
+                'label' => $label,
+                'hls' => $isHls,
+                'embed' => $isEmbed,
+                'weight' => $isEmbed === 0 ? 0 : 1,
+                'orig_index' => $index,
+            ];
+        }
+
+        // Sort so direct streams (weight = 0) are ALWAYS first before embeds (weight = 1)
+        // Within the same weight, preserve original order
+        usort($normalized, function ($a, $b) {
+            if ($a['weight'] !== $b['weight']) {
+                return $a['weight'] <=> $b['weight'];
+            }
+            return $a['orig_index'] <=> $b['orig_index'];
+        });
+
+        // Re-number labels sequentially
+        foreach ($normalized as $idx => &$item) {
+            $opt = $idx + 1;
+            if (empty($item['label']) || strpos($item['label'], 'Opção') === 0 || strpos($item['label'], 'Fonte') === 0) {
+                $item['label'] = "Opção {$opt}";
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Attach MegaEmbed streams to a movie.
+     * Prioritizes direct MP4/HLS links in first place.
      */
     public function attachMovieStreams($movie, $tmdbId)
     {
         // 1. Extrair fontes diretas da request do MegaEmbed
         $directSources = $this->extractDirectSources($tmdbId);
-        if (!empty($directSources)) {
-            // Remover links antigos genéricos do mgeb.top
-            MovieVideo::where('movie_id', $movie->id)
-                ->where('server', 'MegaEmbed (Dublado)')
-                ->where('link', 'like', '%mgeb.top%')
-                ->delete();
+        $sortedSources = !empty($directSources) ? $this->sortSourcesDirectFirst($directSources) : [];
 
-            foreach ($directSources as $index => $source) {
-                $file = trim($source['file'] ?? '');
-                if (empty($file)) continue;
+        // 2. Se vazio, tentar fallback em moderador (se unmasked)
+        if (empty($sortedSources)) {
+            $modLinks = $this->fetchModeratorOriginalLinks('movies', $tmdbId);
+            if (!empty($modLinks)) {
+                $sortedSources = $this->sortSourcesDirectFirst($modLinks);
+            }
+        }
 
-                $type = strtolower($source['type'] ?? '');
-                $label = $source['label'] ?? ('Opção ' . ($index + 1));
-                $isHls = ($type === 'hls' || strpos($file, '.m3u8') !== false) ? 1 : 0;
-                $isEmbed = ($type === 'iframe' || \App\Helpers\EmbedHelper::isEmbedUrl($file)) ? 1 : 0;
+        // Limpar registros anteriores deste filme para evitar links desatualizados ou duplicados
+        MovieVideo::where('movie_id', $movie->id)->delete();
 
-                MovieVideo::updateOrCreate(
-                    [
-                        'movie_id' => $movie->id,
-                        'link' => $file
-                    ],
-                    [
-                        'server' => "MegaEmbed ({$label})",
-                        'lang' => 'Português',
-                        'hls' => $isHls,
-                        'embed' => $isEmbed,
-                        'status' => 1,
-                    ]
-                );
+        if (!empty($sortedSources)) {
+            foreach ($sortedSources as $source) {
+                MovieVideo::create([
+                    'movie_id' => $movie->id,
+                    'server' => "MegaEmbed ({$source['label']})",
+                    'link' => $source['file'],
+                    'lang' => 'Português',
+                    'hls' => $source['hls'],
+                    'embed' => $source['embed'],
+                    'status' => 1,
+                ]);
             }
         } else {
             // Fallback para player Web apenas se a extração direta falhar
-            MovieVideo::updateOrCreate(
-                [
-                    'movie_id' => $movie->id,
-                    'link' => "https://mgeb.top/embed/{$tmdbId}"
-                ],
-                [
-                    'server' => 'MegaEmbed (Player Web)',
-                    'lang' => 'Português',
-                    'embed' => 1,
-                    'status' => 1,
-                ]
-            );
-        }
-
-        // 2. Legendado (Opcional / NHDAPI)
-        MovieVideo::updateOrCreate(
-            [
+            MovieVideo::create([
                 'movie_id' => $movie->id,
-                'link' => "https://nhdapi.com/embed/movie/{$tmdbId}"
-            ],
-            [
-                'server' => 'MegaEmbed (Legendado)',
-                'lang' => 'Legendado',
+                'server' => 'MegaEmbed (Player Web)',
+                'link' => "https://mgeb.top/embed/{$tmdbId}",
+                'lang' => 'Português',
+                'hls' => 0,
                 'embed' => 1,
                 'status' => 1,
-            ]
-        );
+            ]);
+        }
     }
 
     /**
@@ -800,107 +837,49 @@ class MegaEmbedService
 
     /**
      * Attach direct video sources to a series episode.
+     * Prioritizes direct MP4/HLS links in first place.
      */
     public function attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
     {
         // 1. Extrair fontes diretas da request do MegaEmbed (CDN MP4 / HLS)
         $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
+        $sortedSources = !empty($directSources) ? $this->sortSourcesDirectFirst($directSources) : [];
 
-        // 2. Tentar também buscar fontes originais adicionadas pelos moderadores
-        $moderatorLinks = $this->fetchModeratorOriginalLinks('series', $tmdbId, $seasonNumber, $episodeNumber);
-
-        // Remover links antigos genéricos do mgeb.top
-        SerieVideo::where('episode_id', $episode->id)
-            ->where('server', 'MegaEmbed (Dublado)')
-            ->where('link', 'like', '%mgeb.top%')
-            ->delete();
-
-        $savedCount = 0;
-
-        // Salvar fontes diretas extraídas (MP4 / HLS)
-        if (!empty($directSources)) {
-            foreach ($directSources as $index => $source) {
-                $file = trim($source['file'] ?? '');
-                if (empty($file)) continue;
-
-                $type = strtolower($source['type'] ?? '');
-                $label = $source['label'] ?? ('Opção ' . ($index + 1));
-                $isHls = ($type === 'hls' || strpos($file, '.m3u8') !== false) ? 1 : 0;
-                $isEmbed = ($type === 'iframe' || \App\Helpers\EmbedHelper::isEmbedUrl($file)) ? 1 : 0;
-
-                SerieVideo::updateOrCreate(
-                    [
-                        'episode_id' => $episode->id,
-                        'link' => $file
-                    ],
-                    [
-                        'server' => "MegaEmbed ({$label})",
-                        'lang' => 'Português',
-                        'hls' => $isHls,
-                        'embed' => $isEmbed,
-                        'status' => 1,
-                    ]
-                );
-                $savedCount++;
+        // 2. Se vazio, tentar fallback em moderador (apenas links não mascarados)
+        if (empty($sortedSources)) {
+            $moderatorLinks = $this->fetchModeratorOriginalLinks('series', $tmdbId, $seasonNumber, $episodeNumber);
+            if (!empty($moderatorLinks)) {
+                $sortedSources = $this->sortSourcesDirectFirst($moderatorLinks);
             }
         }
 
-        // Salvar fontes originais dos moderadores (caso haja embeds adicionais como streamtape, etc.)
-        if (!empty($moderatorLinks)) {
-            foreach ($moderatorLinks as $idx => $modLink) {
-                $modLink = trim($modLink);
-                if (empty($modLink) || strpos($modLink, '******') !== false) continue;
+        // Limpar registros anteriores deste episódio para não acumular links desatualizados
+        SerieVideo::where('episode_id', $episode->id)->delete();
 
-                $isHls = (strpos($modLink, '.m3u8') !== false) ? 1 : 0;
-                $isEmbed = \App\Helpers\EmbedHelper::isEmbedUrl($modLink) ? 1 : 0;
-                $optNum = $savedCount + $idx + 1;
-
-                SerieVideo::updateOrCreate(
-                    [
-                        'episode_id' => $episode->id,
-                        'link' => $modLink
-                    ],
-                    [
-                        'server' => "MegaEmbed (Fonte {$optNum})",
-                        'lang' => 'Português',
-                        'hls' => $isHls,
-                        'embed' => $isEmbed,
-                        'status' => 1,
-                    ]
-                );
-                $savedCount++;
-            }
-        }
-
-        if ($savedCount === 0) {
-            // Fallback para player Web apenas se a extração direta falhar
-            SerieVideo::updateOrCreate(
-                [
+        if (!empty($sortedSources)) {
+            foreach ($sortedSources as $source) {
+                SerieVideo::create([
                     'episode_id' => $episode->id,
-                    'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
-                ],
-                [
-                    'server' => 'MegaEmbed (Player Web)',
+                    'server' => "MegaEmbed ({$source['label']})",
+                    'link' => $source['file'],
                     'lang' => 'Português',
-                    'embed' => 1,
+                    'hls' => $source['hls'],
+                    'embed' => $source['embed'],
                     'status' => 1,
-                ]
-            );
-        }
-
-        // 2. Legendado (Opcional / NHDAPI)
-        SerieVideo::updateOrCreate(
-            [
+                ]);
+            }
+        } else {
+            // Fallback para player Web apenas se nenhuma fonte direta for encontrada
+            SerieVideo::create([
                 'episode_id' => $episode->id,
-                'link' => "https://nhdapi.com/embed/tv/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
-            ],
-            [
-                'server' => 'MegaEmbed (Legendado)',
-                'lang' => 'Legendado',
+                'server' => 'MegaEmbed (Player Web)',
+                'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}",
+                'lang' => 'Português',
+                'hls' => 0,
                 'embed' => 1,
                 'status' => 1,
-            ]
-        );
+            ]);
+        }
     }
 
     /**
@@ -1083,107 +1062,49 @@ class MegaEmbedService
 
     /**
      * Attach direct video sources to an anime episode.
+     * Prioritizes direct MP4/HLS links in first place.
      */
     public function attachAnimeEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
     {
         // 1. Extrair fontes diretas da request do MegaEmbed (CDN MP4 / HLS)
         $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
+        $sortedSources = !empty($directSources) ? $this->sortSourcesDirectFirst($directSources) : [];
 
-        // 2. Tentar também buscar fontes originais adicionadas pelos moderadores
-        $moderatorLinks = $this->fetchModeratorOriginalLinks('anime', $tmdbId, $seasonNumber, $episodeNumber);
-
-        // Remover links antigos genéricos do mgeb.top
-        AnimeVideo::where('anime_episode_id', $episode->id)
-            ->where('server', 'MegaEmbed (Dublado)')
-            ->where('link', 'like', '%mgeb.top%')
-            ->delete();
-
-        $savedCount = 0;
-
-        // Salvar fontes diretas extraídas (MP4 / HLS)
-        if (!empty($directSources)) {
-            foreach ($directSources as $index => $source) {
-                $file = trim($source['file'] ?? '');
-                if (empty($file)) continue;
-
-                $type = strtolower($source['type'] ?? '');
-                $label = $source['label'] ?? ('Opção ' . ($index + 1));
-                $isHls = ($type === 'hls' || strpos($file, '.m3u8') !== false) ? 1 : 0;
-                $isEmbed = ($type === 'iframe' || \App\Helpers\EmbedHelper::isEmbedUrl($file)) ? 1 : 0;
-
-                AnimeVideo::updateOrCreate(
-                    [
-                        'anime_episode_id' => $episode->id,
-                        'link' => $file
-                    ],
-                    [
-                        'server' => "MegaEmbed ({$label})",
-                        'lang' => 'Português',
-                        'hls' => $isHls,
-                        'embed' => $isEmbed,
-                        'status' => 1,
-                    ]
-                );
-                $savedCount++;
+        // 2. Se vazio, tentar fallback em moderador (apenas links não mascarados)
+        if (empty($sortedSources)) {
+            $moderatorLinks = $this->fetchModeratorOriginalLinks('anime', $tmdbId, $seasonNumber, $episodeNumber);
+            if (!empty($moderatorLinks)) {
+                $sortedSources = $this->sortSourcesDirectFirst($moderatorLinks);
             }
         }
 
-        // Salvar fontes originais dos moderadores (caso haja embeds adicionais como streamtape, etc.)
-        if (!empty($moderatorLinks)) {
-            foreach ($moderatorLinks as $idx => $modLink) {
-                $modLink = trim($modLink);
-                if (empty($modLink) || strpos($modLink, '******') !== false) continue;
+        // Limpar registros anteriores deste episódio de anime
+        AnimeVideo::where('anime_episode_id', $episode->id)->delete();
 
-                $isHls = (strpos($modLink, '.m3u8') !== false) ? 1 : 0;
-                $isEmbed = \App\Helpers\EmbedHelper::isEmbedUrl($modLink) ? 1 : 0;
-                $optNum = $savedCount + $idx + 1;
-
-                AnimeVideo::updateOrCreate(
-                    [
-                        'anime_episode_id' => $episode->id,
-                        'link' => $modLink
-                    ],
-                    [
-                        'server' => "MegaEmbed (Fonte {$optNum})",
-                        'lang' => 'Português',
-                        'hls' => $isHls,
-                        'embed' => $isEmbed,
-                        'status' => 1,
-                    ]
-                );
-                $savedCount++;
-            }
-        }
-
-        // Se nenhuma fonte direta ou moderador foi encontrada, fallback web player
-        if ($savedCount === 0) {
-            AnimeVideo::updateOrCreate(
-                [
+        if (!empty($sortedSources)) {
+            foreach ($sortedSources as $source) {
+                AnimeVideo::create([
                     'anime_episode_id' => $episode->id,
-                    'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
-                ],
-                [
-                    'server' => 'MegaEmbed (Player Web)',
+                    'server' => "MegaEmbed ({$source['label']})",
+                    'link' => $source['file'],
                     'lang' => 'Português',
-                    'embed' => 1,
+                    'hls' => $source['hls'],
+                    'embed' => $source['embed'],
                     'status' => 1,
-                ]
-            );
-        }
-
-        // 2. Legendado (Opcional / NHDAPI)
-        AnimeVideo::updateOrCreate(
-            [
+                ]);
+            }
+        } else {
+            // Fallback para player Web apenas se nenhuma fonte direta for encontrada
+            AnimeVideo::create([
                 'anime_episode_id' => $episode->id,
-                'link' => "https://nhdapi.com/embed/tv/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
-            ],
-            [
-                'server' => 'MegaEmbed (Legendado)',
-                'lang' => 'Legendado',
+                'server' => 'MegaEmbed (Player Web)',
+                'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}",
+                'lang' => 'Português',
+                'hls' => 0,
                 'embed' => 1,
                 'status' => 1,
-            ]
-        );
+            ]);
+        }
     }
 
     /**

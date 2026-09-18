@@ -81,7 +81,7 @@ class Movie extends Model
 
     public function videos()
     {
-        return $this->hasMany('App\MovieVideo');
+        return $this->hasMany('App\MovieVideo')->orderBy('embed', 'asc')->orderBy('id', 'asc');
     }
 
 

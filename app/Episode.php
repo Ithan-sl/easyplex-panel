@@ -33,7 +33,7 @@ class Episode extends Model
      }
 
 public function videos() : HasMany {
-        return $this->hasMany(SerieVideo::class);
+        return $this->hasMany(SerieVideo::class)->orderBy('embed', 'asc')->orderBy('id', 'asc');
      }
 
 

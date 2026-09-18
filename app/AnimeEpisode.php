@@ -30,7 +30,7 @@ class AnimeEpisode extends Model
 
     public function videos()
     {
-        return $this->hasMany('App\AnimeVideo', 'anime_episode_id');
+        return $this->hasMany('App\AnimeVideo', 'anime_episode_id')->orderBy('embed', 'asc')->orderBy('id', 'asc');
     }
 
 

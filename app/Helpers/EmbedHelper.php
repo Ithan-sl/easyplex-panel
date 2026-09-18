@@ -35,7 +35,13 @@ class EmbedHelper
             return $linkData;
         }
 
-        // 3. Direct video file extensions should NOT be auto-converted to embed
+        // 3. Direct video files or streams (.mp4, .m3u8, etc.) should NEVER be classified as embed
+        $lower = strtolower($rawLink);
+        if (strpos($lower, '.mp4') !== false || strpos($lower, '.m3u8') !== false || strpos($lower, '.mkv') !== false) {
+            $linkData['embed'] = 0;
+            return $linkData;
+        }
+
         $parsedPath = parse_url($rawLink, PHP_URL_PATH);
         if ($parsedPath && preg_match('/\.(mp4|m3u8|mkv|mpd|ts|avi|mov|webm)$/i', $parsedPath)) {
             $linkData['embed'] = 0;
@@ -43,9 +49,8 @@ class EmbedHelper
         }
 
         // 4. Auto-detect embed URLs by patterns and known embed providers
-        $lower = strtolower($rawLink);
         $embedPatterns = [
-            '/embed/', '/e/', '/v/', '/iframe/', 'player.',
+            '/embed/', '/e/', '/v/', '/iframe/',
             'streamtape', 'dood', 'filemoon', 'mixdrop', 'superembed',
             'vidsrc', 'vidmoly', 'voe.sx', 'upstream.to', 'ok.ru/videoembed',
             'youtube.com/embed', 'youtu.be', 'vidhide', 'streamwish',
@@ -81,14 +86,18 @@ class EmbedHelper
             return true;
         }
 
+        $lower = strtolower($trimmed);
+        if (strpos($lower, '.mp4') !== false || strpos($lower, '.m3u8') !== false || strpos($lower, '.mkv') !== false) {
+            return false;
+        }
+
         $parsedPath = parse_url($trimmed, PHP_URL_PATH);
         if ($parsedPath && preg_match('/\.(mp4|m3u8|mkv|mpd|ts|avi|mov|webm)$/i', $parsedPath)) {
             return false;
         }
 
-        $lower = strtolower($trimmed);
         $embedPatterns = [
-            '/embed/', '/e/', '/v/', '/iframe/', 'player.',
+            '/embed/', '/e/', '/v/', '/iframe/',
             'streamtape', 'dood', 'filemoon', 'mixdrop', 'superembed',
             'vidsrc', 'vidmoly', 'voe.sx', 'upstream.to', 'ok.ru/videoembed',
             'youtube.com/embed', 'youtu.be', 'vidhide', 'streamwish',
