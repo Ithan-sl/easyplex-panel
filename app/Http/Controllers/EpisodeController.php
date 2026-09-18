@@ -180,7 +180,7 @@ class EpisodeController extends Controller
 
         $hasInvalidOrGeneric = $model->videos->isEmpty()
             || $model->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
-            || $model->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false; });
+            || $model->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false || strpos($v->link, 'r2.cloudflarestorage.com') !== false; });
 
         if ($hasInvalidOrGeneric) {
             $season = $model->season;
@@ -219,7 +219,7 @@ class EpisodeController extends Controller
 
         $hasInvalidOrGeneric = $model->videos->isEmpty()
             || $model->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
-            || $model->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false; });
+            || $model->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false || strpos($v->link, 'r2.cloudflarestorage.com') !== false; });
 
         if ($hasInvalidOrGeneric) {
             $season = $model->season;

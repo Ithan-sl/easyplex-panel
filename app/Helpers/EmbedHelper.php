@@ -56,7 +56,7 @@ class EmbedHelper
             'youtube.com/embed', 'youtu.be', 'vidhide', 'streamwish',
             'mp4upload', 'uqload', 'luluvdo', 'dropload', 'hexupload',
             'embedgram', 'netu.tv', 'waaw.tv', 'wolfstream',
-            'mgeb.top', 'megaembed', 'nhdapi.com'
+            'mgeb.top', 'megaembed', 'embedplayer', 'nhdapi.com'
         ];
 
         foreach ($embedPatterns as $pattern) {
@@ -103,7 +103,7 @@ class EmbedHelper
             'youtube.com/embed', 'youtu.be', 'vidhide', 'streamwish',
             'mp4upload', 'uqload', 'luluvdo', 'dropload', 'hexupload',
             'embedgram', 'netu.tv', 'waaw.tv', 'wolfstream',
-            'mgeb.top', 'megaembed', 'nhdapi.com'
+            'mgeb.top', 'megaembed', 'embedplayer', 'nhdapi.com'
         ];
 
         foreach ($embedPatterns as $pattern) {

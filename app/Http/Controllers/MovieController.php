@@ -113,9 +113,9 @@ class MovieController extends Controller
             ->where('id', '=', $id)->first();
 
         if ($movie) {
-            $hasOnlyGeneric = $movie->videos->isEmpty() || $movie->videos->every(function ($v) {
-                return strpos($v->link, 'mgeb.top') !== false;
-            });
+            $hasOnlyGeneric = $movie->videos->isEmpty()
+                || $movie->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
+                || $movie->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false || strpos($v->link, 'r2.cloudflarestorage.com') !== false; });
             if ($hasOnlyGeneric && !empty($movie->tmdb_id)) {
                 try {
                     app(\App\Services\MegaEmbedService::class)->attachMovieStreams($movie, $movie->tmdb_id);
@@ -2287,7 +2287,7 @@ class MovieController extends Controller
         if ($movie) {
             $hasOnlyGeneric = $movie->videos->isEmpty()
                 || $movie->videos->every(function ($v) { return strpos($v->link, 'mgeb.top') !== false; })
-                || $movie->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false; });
+                || $movie->videos->contains(function ($v) { return strpos($v->link, 'nhdapi.com') !== false || strpos($v->link, 'novix.x10.mx') !== false || strpos($v->link, 'r2.cloudflarestorage.com') !== false; });
 
             if ($hasOnlyGeneric && !empty($movie->tmdb_id)) {
                 try {

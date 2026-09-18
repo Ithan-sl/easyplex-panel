@@ -467,20 +467,38 @@ class MegaEmbedService
 
             if (is_string($source)) {
                 $file = trim($source);
-                $label = 'Opção ' . ($index + 1);
+                $label = '';
             } elseif (is_array($source)) {
                 $file = trim($source['file'] ?? $source['url'] ?? '');
-                $label = $source['label'] ?? ('Opção ' . ($index + 1));
-                $type = strtolower($source['type'] ?? '');
+                $label = trim($source['label'] ?? '');
+                $type = strtolower($source['type'] ?? $source['format'] ?? '');
             }
 
             if (empty($file) || strpos($file, '******') !== false) {
                 continue;
             }
 
+            // Discard dead / broken hosts
+            if (strpos($file, 'novix.x10.mx') !== false) {
+                continue;
+            }
+
+            // Discard temporary presigned R2/S3 URLs that expire or get cut off if other permanent sources exist
+            if (strpos($file, 'r2.cloudflarestorage.com') !== false && count($sources) > 1) {
+                continue;
+            }
+
             $isHls = ($type === 'hls' || strpos(strtolower($file), '.m3u8') !== false) ? 1 : 0;
             $isDirect = ($type === 'mp4' || $type === 'hls' || strpos(strtolower($file), '.mp4') !== false || strpos(strtolower($file), '.m3u8') !== false || !\App\Helpers\EmbedHelper::isEmbedUrl($file));
             $isEmbed = ($isDirect && $type !== 'iframe') ? 0 : 1;
+
+            if (empty($label)) {
+                if (strpos($file, '/dub') !== false) {
+                    $label = 'Dublado';
+                } elseif (strpos($file, '/leg') !== false) {
+                    $label = 'Legendado';
+                }
+            }
 
             $normalized[] = [
                 'file' => $file,
@@ -493,7 +511,6 @@ class MegaEmbedService
         }
 
         // Sort so direct streams (weight = 0) are ALWAYS first before embeds (weight = 1)
-        // Within the same weight, preserve original order
         usort($normalized, function ($a, $b) {
             if ($a['weight'] !== $b['weight']) {
                 return $a['weight'] <=> $b['weight'];
@@ -501,11 +518,16 @@ class MegaEmbedService
             return $a['orig_index'] <=> $b['orig_index'];
         });
 
-        // Re-number labels sequentially
-        foreach ($normalized as $idx => &$item) {
-            $opt = $idx + 1;
-            if (empty($item['label']) || strpos($item['label'], 'Opção') === 0 || strpos($item['label'], 'Fonte') === 0) {
-                $item['label'] = "Opção {$opt}";
+        // Set clean labels
+        $directIdx = 1;
+        foreach ($normalized as &$item) {
+            if (empty($item['label']) || strpos($item['label'], 'Opção') === 0) {
+                if ($item['embed'] === 0) {
+                    $item['label'] = "Opção {$directIdx}";
+                    $directIdx++;
+                } else {
+                    $item['label'] = "Player Web";
+                }
             }
         }
 
@@ -818,9 +840,23 @@ class MegaEmbedService
                         if (is_array($links)) {
                             $extracted = [];
                             foreach ($links as $l) {
-                                $u = $l['original_url'] ?? $l['url'] ?? '';
+                                $u = trim($l['original_url'] ?? $l['url'] ?? '');
                                 if (!empty($u) && strpos($u, '******') === false) {
-                                    $extracted[] = $u;
+                                    if (strpos($u, 'novix.x10.mx') !== false) {
+                                        continue;
+                                    }
+                                    $fmt = strtolower($l['format'] ?? '');
+                                    $lbl = '';
+                                    if (strpos($u, '/dub') !== false) {
+                                        $lbl = 'Dublado';
+                                    } elseif (strpos($u, '/leg') !== false) {
+                                        $lbl = 'Legendado';
+                                    }
+                                    $extracted[] = [
+                                        'file' => $u,
+                                        'type' => $fmt,
+                                        'label' => $lbl
+                                    ];
                                 }
                             }
                             return $extracted;
@@ -841,15 +877,15 @@ class MegaEmbedService
      */
     public function attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
     {
-        // 1. Extrair fontes diretas da request do MegaEmbed (CDN MP4 / HLS)
-        $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
-        $sortedSources = !empty($directSources) ? $this->sortSourcesDirectFirst($directSources) : [];
+        // 1. Tentar primeiro obter as fontes originais dos moderadores (nixplay.lat MP4 direto, api.embedplayer dub/leg)
+        $moderatorLinks = $this->fetchModeratorOriginalLinks('series', $tmdbId, $seasonNumber, $episodeNumber);
+        $sortedSources = !empty($moderatorLinks) ? $this->sortSourcesDirectFirst($moderatorLinks) : [];
 
-        // 2. Se vazio, tentar fallback em moderador (apenas links não mascarados)
+        // 2. Se vazio, extrair fontes do player web do MegaEmbed
         if (empty($sortedSources)) {
-            $moderatorLinks = $this->fetchModeratorOriginalLinks('series', $tmdbId, $seasonNumber, $episodeNumber);
-            if (!empty($moderatorLinks)) {
-                $sortedSources = $this->sortSourcesDirectFirst($moderatorLinks);
+            $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
+            if (!empty($directSources)) {
+                $sortedSources = $this->sortSourcesDirectFirst($directSources);
             }
         }
 
@@ -862,7 +898,7 @@ class MegaEmbedService
                     'episode_id' => $episode->id,
                     'server' => "MegaEmbed ({$source['label']})",
                     'link' => $source['file'],
-                    'lang' => 'Português',
+                    'lang' => ($source['label'] === 'Legendado') ? 'Legendado' : 'Português',
                     'hls' => $source['hls'],
                     'embed' => $source['embed'],
                     'status' => 1,
@@ -873,7 +909,7 @@ class MegaEmbedService
             SerieVideo::create([
                 'episode_id' => $episode->id,
                 'server' => 'MegaEmbed (Player Web)',
-                'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}",
+                'link' => "https://megaembed.com/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}",
                 'lang' => 'Português',
                 'hls' => 0,
                 'embed' => 1,
@@ -1066,15 +1102,15 @@ class MegaEmbedService
      */
     public function attachAnimeEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
     {
-        // 1. Extrair fontes diretas da request do MegaEmbed (CDN MP4 / HLS)
-        $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
-        $sortedSources = !empty($directSources) ? $this->sortSourcesDirectFirst($directSources) : [];
+        // 1. Tentar primeiro obter as fontes originais dos moderadores (nixplay.lat MP4 direto, api.embedplayer dub/leg)
+        $moderatorLinks = $this->fetchModeratorOriginalLinks('anime', $tmdbId, $seasonNumber, $episodeNumber);
+        $sortedSources = !empty($moderatorLinks) ? $this->sortSourcesDirectFirst($moderatorLinks) : [];
 
-        // 2. Se vazio, tentar fallback em moderador (apenas links não mascarados)
+        // 2. Se vazio, tentar fallback na extração do player web do MegaEmbed
         if (empty($sortedSources)) {
-            $moderatorLinks = $this->fetchModeratorOriginalLinks('anime', $tmdbId, $seasonNumber, $episodeNumber);
-            if (!empty($moderatorLinks)) {
-                $sortedSources = $this->sortSourcesDirectFirst($moderatorLinks);
+            $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
+            if (!empty($directSources)) {
+                $sortedSources = $this->sortSourcesDirectFirst($directSources);
             }
         }
 
@@ -1087,7 +1123,7 @@ class MegaEmbedService
                     'anime_episode_id' => $episode->id,
                     'server' => "MegaEmbed ({$source['label']})",
                     'link' => $source['file'],
-                    'lang' => 'Português',
+                    'lang' => ($source['label'] === 'Legendado') ? 'Legendado' : 'Português',
                     'hls' => $source['hls'],
                     'embed' => $source['embed'],
                     'status' => 1,
