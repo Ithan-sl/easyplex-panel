@@ -559,7 +559,7 @@ class MegaEmbedService
             foreach ($sortedSources as $source) {
                 MovieVideo::create([
                     'movie_id' => $movie->id,
-                    'server' => "MegaEmbed ({$source['label']})",
+                    'server' => 'Servidor',
                     'link' => $source['file'],
                     'lang' => 'Português',
                     'hls' => $source['hls'],
@@ -571,7 +571,7 @@ class MegaEmbedService
             // Fallback para player Web apenas se a extração direta falhar
             MovieVideo::create([
                 'movie_id' => $movie->id,
-                'server' => 'MegaEmbed (Player Web)',
+                'server' => 'Servidor',
                 'link' => "https://mgeb.top/embed/{$tmdbId}",
                 'lang' => 'Português',
                 'hls' => 0,
@@ -716,7 +716,7 @@ class MegaEmbedService
                                     'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$epNumber}"
                                 ],
                                 [
-                                    'server' => 'MegaEmbed (Player Web)',
+                                    'server' => 'Servidor',
                                     'lang' => 'Português',
                                     'embed' => 1,
                                     'status' => 1,
@@ -896,7 +896,7 @@ class MegaEmbedService
             foreach ($sortedSources as $source) {
                 SerieVideo::create([
                     'episode_id' => $episode->id,
-                    'server' => "MegaEmbed ({$source['label']})",
+                    'server' => 'Servidor',
                     'link' => $source['file'],
                     'lang' => ($source['label'] === 'Legendado') ? 'Legendado' : 'Português',
                     'hls' => $source['hls'],
@@ -908,7 +908,7 @@ class MegaEmbedService
             // Fallback para player Web apenas se nenhuma fonte direta for encontrada
             SerieVideo::create([
                 'episode_id' => $episode->id,
-                'server' => 'MegaEmbed (Player Web)',
+                'server' => 'Servidor',
                 'link' => "https://megaembed.com/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}",
                 'lang' => 'Português',
                 'hls' => 0,
@@ -1071,7 +1071,7 @@ class MegaEmbedService
                                     'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$epNumber}"
                                 ],
                                 [
-                                    'server' => 'MegaEmbed (Player Web)',
+                                    'server' => 'Servidor',
                                     'lang' => 'Português',
                                     'embed' => 1,
                                     'status' => 1,
@@ -1121,7 +1121,7 @@ class MegaEmbedService
             foreach ($sortedSources as $source) {
                 AnimeVideo::create([
                     'anime_episode_id' => $episode->id,
-                    'server' => "MegaEmbed ({$source['label']})",
+                    'server' => 'Servidor',
                     'link' => $source['file'],
                     'lang' => ($source['label'] === 'Legendado') ? 'Legendado' : 'Português',
                     'hls' => $source['hls'],
@@ -1133,7 +1133,7 @@ class MegaEmbedService
             // Fallback para player Web apenas se nenhuma fonte direta for encontrada
             AnimeVideo::create([
                 'anime_episode_id' => $episode->id,
-                'server' => 'MegaEmbed (Player Web)',
+                'server' => 'Servidor',
                 'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}",
                 'lang' => 'Português',
                 'hls' => 0,
