@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class AnimeCast extends Model
 {
-    protected $appends = ['name'];
+    protected $fillable = ['anime_id', 'cast_id'];
 
+    protected $appends = ['name'];
 
     protected $hidden = [
         'cast'

@@ -68,13 +68,13 @@ class MegaEmbedController extends Controller
     }
 
     /**
-     * Import a single Movie or Series by TMDb ID.
+     * Import a single Movie, Series or Anime by TMDb ID.
      */
     public function importSingle(Request $request)
     {
         $this->validate($request, [
             'tmdb_id' => 'required|integer',
-            'type' => 'required|in:movie,series',
+            'type' => 'required|in:movie,series,anime',
             'overwrite' => 'nullable|boolean'
         ]);
 
@@ -83,7 +83,9 @@ class MegaEmbedController extends Controller
         $overwrite = (bool) $request->input('overwrite', false);
 
         try {
-            if ($type === 'series') {
+            if ($type === 'anime') {
+                $result = $this->service->importAnime($tmdbId, $overwrite);
+            } elseif ($type === 'series') {
                 $result = $this->service->importSeries($tmdbId, $overwrite);
             } else {
                 $result = $this->service->importMovie($tmdbId, $overwrite);
@@ -105,7 +107,7 @@ class MegaEmbedController extends Controller
     public function importBatch(Request $request)
     {
         $this->validate($request, [
-            'type' => 'required|in:movie,series',
+            'type' => 'required|in:movie,series,anime',
             'offset' => 'nullable|integer|min:0',
             'limit' => 'nullable|integer|min:1|max:25',
             'overwrite' => 'nullable|boolean'
@@ -117,16 +119,22 @@ class MegaEmbedController extends Controller
         $overwrite = (bool) $request->input('overwrite', false);
 
         try {
-            $catalog = $type === 'series'
-                ? $this->service->fetchMegaEmbedSeriesList()
-                : $this->service->fetchMegaEmbedMoviesList();
+            if ($type === 'anime') {
+                $catalog = $this->service->fetchMegaEmbedAnimesList();
+            } elseif ($type === 'series') {
+                $catalog = $this->service->fetchMegaEmbedSeriesList();
+            } else {
+                $catalog = $this->service->fetchMegaEmbedMoviesList();
+            }
 
             $totalCatalog = count($catalog);
             $slice = array_slice($catalog, $offset, $limit);
 
             $results = [];
             foreach ($slice as $tmdbId) {
-                if ($type === 'series') {
+                if ($type === 'anime') {
+                    $res = $this->service->importAnime($tmdbId, $overwrite);
+                } elseif ($type === 'series') {
                     $res = $this->service->importSeries($tmdbId, $overwrite);
                 } else {
                     $res = $this->service->importMovie($tmdbId, $overwrite);

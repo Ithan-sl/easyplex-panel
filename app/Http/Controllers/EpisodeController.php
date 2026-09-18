@@ -206,13 +206,35 @@ class EpisodeController extends Controller
 
     public function videosAnime($episode)
     {
-        
-
-
         $model = AnimeEpisode::where('id', $episode)->orWhere('tmdb_id', '=', $episode)->first();
 
-        return response()->json(['episode_stream' => $model->videos], 200);
+        if (!$model) {
+            return response()->json(['episode_stream' => []], 200);
+        }
 
+        $hasOnlyGeneric = $model->videos->isEmpty() || $model->videos->every(function ($v) {
+            return strpos($v->link, 'mgeb.top') !== false;
+        });
+
+        if ($hasOnlyGeneric) {
+            $season = $model->season;
+            $anime = $season ? $season->anime : null;
+            if ($anime && !empty($anime->tmdb_id) && $season && $season->season_number && $model->episode_number) {
+                try {
+                    app(\App\Services\MegaEmbedService::class)->attachAnimeEpisodeStreams(
+                        $model,
+                        $anime->tmdb_id,
+                        $season->season_number,
+                        $model->episode_number
+                    );
+                    $model->load('videos');
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("EpisodeController@videosAnime attachAnimeEpisodeStreams error: " . $e->getMessage());
+                }
+            }
+        }
+
+        return response()->json(['episode_stream' => $model->videos], 200);
     }
 
 

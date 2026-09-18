@@ -20,46 +20,68 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="col-md-3 grid-margin stretch-card">
+    <div class="col-md-2 grid-margin stretch-card">
       <div class="card bg-gradient-primary text-white">
-        <div class="card-body">
-          <h6 class="font-weight-normal mb-1">Filmes no MegaEmbed</h6>
-          <h3 class="font-weight-bold mb-2">{{ stats.megaembed_movies_total || '...' }}</h3>
-          <p class="mb-0 text-white-50 font-size-sm">
-            Importados: <strong>{{ stats.movies_imported_count || 0 }}</strong> | Pendentes: <strong>{{ stats.movies_pending_count || 0 }}</strong>
+        <div class="card-body p-3">
+          <h6 class="font-weight-normal mb-1">Filmes MegaEmbed</h6>
+          <h4 class="font-weight-bold mb-1">{{ stats.megaembed_movies_total || '...' }}</h4>
+          <p class="mb-0 text-white-50 font-size-xs">
+            Imp: <strong>{{ stats.movies_imported_count || 0 }}</strong> | Pend: <strong>{{ stats.movies_pending_count || 0 }}</strong>
           </p>
         </div>
       </div>
     </div>
 
-    <div class="col-md-3 grid-margin stretch-card">
+    <div class="col-md-2 grid-margin stretch-card">
       <div class="card bg-gradient-success text-white">
-        <div class="card-body">
-          <h6 class="font-weight-normal mb-1">Séries no MegaEmbed</h6>
-          <h3 class="font-weight-bold mb-2">{{ stats.megaembed_series_total || '...' }}</h3>
-          <p class="mb-0 text-white-50 font-size-sm">
-            Importadas: <strong>{{ stats.series_imported_count || 0 }}</strong> | Pendentes: <strong>{{ stats.series_pending_count || 0 }}</strong>
+        <div class="card-body p-3">
+          <h6 class="font-weight-normal mb-1">Séries MegaEmbed</h6>
+          <h4 class="font-weight-bold mb-1">{{ stats.megaembed_series_total || '...' }}</h4>
+          <p class="mb-0 text-white-50 font-size-xs">
+            Imp: <strong>{{ stats.series_imported_count || 0 }}</strong> | Pend: <strong>{{ stats.series_pending_count || 0 }}</strong>
           </p>
         </div>
       </div>
     </div>
 
-    <div class="col-md-3 grid-margin stretch-card">
-      <div class="card bg-gradient-info text-white">
-        <div class="card-body">
-          <h6 class="font-weight-normal mb-1">Filmes no Catálogo Local</h6>
-          <h3 class="font-weight-bold mb-2">{{ stats.local_movies_total || 0 }}</h3>
-          <p class="mb-0 text-white-50 font-size-sm">Disponíveis no EasyPlex</p>
+    <div class="col-md-2 grid-margin stretch-card">
+      <div class="card bg-gradient-danger text-white">
+        <div class="card-body p-3">
+          <h6 class="font-weight-normal mb-1">Animes MegaEmbed</h6>
+          <h4 class="font-weight-bold mb-1">{{ stats.megaembed_animes_total || '...' }}</h4>
+          <p class="mb-0 text-white-50 font-size-xs">
+            Imp: <strong>{{ stats.animes_imported_count || 0 }}</strong> | Pend: <strong>{{ stats.animes_pending_count || 0 }}</strong>
+          </p>
         </div>
       </div>
     </div>
 
-    <div class="col-md-3 grid-margin stretch-card">
+    <div class="col-md-2 grid-margin stretch-card">
+      <div class="card bg-gradient-info text-white">
+        <div class="card-body p-3">
+          <h6 class="font-weight-normal mb-1">Filmes no Painel</h6>
+          <h4 class="font-weight-bold mb-1">{{ stats.local_movies_total || 0 }}</h4>
+          <p class="mb-0 text-white-50 font-size-xs">Catálogo Local</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-2 grid-margin stretch-card">
       <div class="card bg-gradient-warning text-white">
-        <div class="card-body">
-          <h6 class="font-weight-normal mb-1">Séries no Catálogo Local</h6>
-          <h3 class="font-weight-bold mb-2">{{ stats.local_series_total || 0 }}</h3>
-          <p class="mb-0 text-white-50 font-size-sm">Disponíveis no EasyPlex</p>
+        <div class="card-body p-3">
+          <h6 class="font-weight-normal mb-1">Séries no Painel</h6>
+          <h4 class="font-weight-bold mb-1">{{ stats.local_series_total || 0 }}</h4>
+          <p class="mb-0 text-white-50 font-size-xs">Catálogo Local</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-2 grid-margin stretch-card">
+      <div class="card bg-gradient-dark text-white">
+        <div class="card-body p-3">
+          <h6 class="font-weight-normal mb-1">Animes no Painel</h6>
+          <h4 class="font-weight-bold mb-1">{{ stats.local_animes_total || 0 }}</h4>
+          <p class="mb-0 text-white-50 font-size-xs">Catálogo Local</p>
         </div>
       </div>
     </div>
@@ -113,6 +135,7 @@
                     <select v-model="batchForm.type" class="form-control" :disabled="batchRunning">
                       <option value="movie">Filmes</option>
                       <option value="series">Séries</option>
+                      <option value="anime">Animes</option>
                     </select>
                   </div>
 
@@ -471,7 +494,7 @@ export default {
       this.batchProgress.completed = false;
       this.batchOffset = 0;
 
-      const typeLabel = this.batchForm.type === 'series' ? 'séries' : 'filmes';
+      const typeLabel = this.batchForm.type === 'anime' ? 'animes' : (this.batchForm.type === 'series' ? 'séries' : 'filmes');
       this.addLog(`Iniciando importação de até ${this.batchForm.limit} ${typeLabel}...`, 'info');
       this.batchStatusText = `Conectando ao catálogo de ${typeLabel}...`;
 
@@ -488,7 +511,8 @@ export default {
       }
 
       const limit = Math.min(this.batchForm.chunkSize, remaining);
-      this.batchStatusText = `Processando lote de ${limit} ${this.batchForm.type === 'series' ? 'séries' : 'filmes'}...`;
+      const typeLabel = this.batchForm.type === 'anime' ? 'animes' : (this.batchForm.type === 'series' ? 'séries' : 'filmes');
+      this.batchStatusText = `Processando lote de ${limit} ${typeLabel}...`;
 
       try {
         const response = await axios.post(url + '/admin/megaembed/import-batch', {
@@ -586,8 +610,9 @@ export default {
 
     async importItem(item) {
       this.$set(item, 'importing', true);
+      const isJapan = (item.origin_country && item.origin_country.includes('JP')) || item.original_language === 'ja';
       const isSeries = item.media_type === 'tv' || !!item.first_air_date;
-      const type = isSeries ? 'series' : 'movie';
+      const type = (isSeries && isJapan) ? 'anime' : (isSeries ? 'series' : 'movie');
 
       try {
         const response = await axios.post(url + '/admin/megaembed/import-single', {

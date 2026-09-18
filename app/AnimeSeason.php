@@ -13,9 +13,11 @@ class AnimeSeason extends Model
 
     public function episodes()
     {
-        return $this->hasMany(AnimeEpisode::class)->orderBy('episode_number');
-
+        return $this->hasMany(AnimeEpisode::class, 'anime_season_id')->orderBy('episode_number');
     }
 
-
+    public function anime()
+    {
+        return $this->belongsTo(Anime::class, 'anime_id');
+    }
 }

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AnimeGenre extends Model
 {
+    protected $fillable = ['anime_id', 'genre_id'];
+
     protected $appends = ['name'];
 
    protected $hidden = [

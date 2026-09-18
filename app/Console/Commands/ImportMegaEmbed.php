@@ -13,7 +13,7 @@ class ImportMegaEmbed extends Command
      * @var string
      */
     protected $signature = 'megaembed:import
-                            {--type=all : Type of content: movie, series, or all}
+                            {--type=all : Type of content: movie, series, anime, or all}
                             {--limit=50 : Number of items to import (0 for unlimited)}
                             {--offset=0 : Offset index to start from}
                             {--id= : Specific TMDb ID to import}
@@ -26,7 +26,7 @@ class ImportMegaEmbed extends Command
      *
      * @var string
      */
-    protected $description = 'Import movies and series automatically from MegaEmbed and TheMovieDB (pt-BR)';
+    protected $description = 'Import movies, series and animes automatically from MegaEmbed and TheMovieDB (pt-BR)';
 
     /**
      * Execute the console command.
@@ -59,7 +59,10 @@ class ImportMegaEmbed extends Command
         // Single ID import
         if ($specificId) {
             $tmdbId = (int) $specificId;
-            if ($type === 'series') {
+            if ($type === 'anime') {
+                $this->info("Importando Anime TMDb #{$tmdbId}...");
+                $res = $service->importAnime($tmdbId, $overwrite);
+            } elseif ($type === 'series') {
                 $this->info("Importando Série TMDb #{$tmdbId}...");
                 $res = $service->importSeries($tmdbId, $overwrite);
             } else {
@@ -170,6 +173,56 @@ class ImportMegaEmbed extends Command
             $bar->finish();
             $this->info("\n");
             $this->info("Séries finalizadas: {$imported} novas importadas, {$skipped} já existentes, {$failed} erros.\n");
+        }
+
+        // Batch Animes Import
+        if ($type === 'anime' || $type === 'all') {
+            $this->info("\nObtendo catálogo de Animes do MegaEmbed...");
+            $animes = $service->fetchMegaEmbedAnimesList();
+            $totalAnimes = count($animes);
+            $this->info("Total de Animes disponíveis no MegaEmbed: {$totalAnimes}");
+
+            if ($offset > 0) {
+                $animes = array_slice($animes, $offset);
+            }
+            if ($limit > 0) {
+                $animes = array_slice($animes, 0, $limit);
+            }
+
+            $countToProcess = count($animes);
+            if ($countToProcess > 0) {
+                $this->info("Processando {$countToProcess} animes (iniciando do offset {$offset})...\n");
+
+                $bar = $this->output->createProgressBar($countToProcess);
+                $bar->start();
+
+                $imported = 0;
+                $skipped = 0;
+                $failed = 0;
+
+                foreach ($animes as $tmdbId) {
+                    $res = $service->importAnime($tmdbId, $overwrite);
+                    if ($res['success']) {
+                        if (($res['status'] ?? '') === 'already_exists') {
+                            $skipped++;
+                        } else {
+                            $imported++;
+                        }
+                    } else {
+                        $failed++;
+                    }
+
+                    $bar->advance();
+
+                    if ($delay > 0) {
+                        sleep($delay);
+                    }
+                }
+
+                $bar->finish();
+                $this->info("\n");
+                $this->info("Animes finalizados: {$imported} novos importados, {$skipped} já existentes, {$failed} erros.\n");
+            }
         }
 
         $this->info("Operação concluída com sucesso!");

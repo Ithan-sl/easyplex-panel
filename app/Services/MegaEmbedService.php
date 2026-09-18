@@ -8,14 +8,21 @@ use App\Season;
 use App\Episode;
 use App\MovieVideo;
 use App\SerieVideo;
+use App\Anime;
+use App\AnimeSeason;
+use App\AnimeEpisode;
+use App\AnimeVideo;
 use App\Genre;
 use App\MovieGenre;
 use App\SerieGenre;
+use App\AnimeGenre;
 use App\Cast;
 use App\MovieCast;
 use App\SerieCast;
+use App\AnimeCast;
 use App\Setting;
 use GuzzleHttp\Client;
+use GuzzleHttp\Cookie\FileCookieJar;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -90,28 +97,86 @@ class MegaEmbedService
     }
 
     /**
+     * Get array of all Anime TMDb IDs from MegaEmbed moderator panel.
+     * Cached for 60 minutes.
+     */
+    public function fetchMegaEmbedAnimesList($forceRefresh = false)
+    {
+        $cacheKey = 'megaembed_animes_catalog';
+        if ($forceRefresh) {
+            Cache::forget($cacheKey);
+        }
+
+        return Cache::remember($cacheKey, 3600, function () {
+            try {
+                $modClient = $this->getModeratorSessionClient();
+                if (!$modClient) {
+                    return [];
+                }
+
+                $allIds = [];
+                $firstPage = $modClient->get("https://megaembed.com/moderador/animes?page=1")->getBody()->getContents();
+                preg_match_all('/<td[^>]*font-mono[^>]*>\s*#(\d+)/', $firstPage, $matches);
+                if (!empty($matches[1])) {
+                    foreach ($matches[1] as $id) {
+                        $allIds[] = (int) $id;
+                    }
+                }
+
+                $totalPages = 1;
+                if (preg_match('/Página\s+\d+\s+de\s+(\d+)/i', $firstPage, $pMatches)) {
+                    $totalPages = (int) $pMatches[1];
+                }
+
+                $maxPages = min($totalPages, 25);
+                for ($p = 2; $p <= $maxPages; $p++) {
+                    $html = $modClient->get("https://megaembed.com/moderador/animes?page={$p}")->getBody()->getContents();
+                    preg_match_all('/<td[^>]*font-mono[^>]*>\s*#(\d+)/', $html, $m);
+                    if (!empty($m[1])) {
+                        foreach ($m[1] as $id) {
+                            $allIds[] = (int) $id;
+                        }
+                    }
+                }
+
+                return array_values(array_unique(array_filter($allIds)));
+            } catch (\Throwable $e) {
+                Log::error('MegaEmbedService::fetchMegaEmbedAnimesList error: ' . $e->getMessage());
+                return [];
+            }
+        });
+    }
+
+    /**
      * Returns statistics of MegaEmbed catalog vs local database.
      */
     public function getStats()
     {
         $megaMovies = $this->fetchMegaEmbedMoviesList();
         $megaSeries = $this->fetchMegaEmbedSeriesList();
+        $megaAnimes = $this->fetchMegaEmbedAnimesList();
 
         $localMoviesCount = Movie::count();
         $localSeriesCount = Serie::count();
+        $localAnimesCount = Anime::count();
 
         $importedMovieIds = Movie::whereIn('tmdb_id', $megaMovies)->pluck('tmdb_id')->toArray();
         $importedSeriesIds = Serie::whereIn('tmdb_id', $megaSeries)->pluck('tmdb_id')->toArray();
+        $importedAnimeIds = Anime::whereIn('tmdb_id', $megaAnimes)->pluck('tmdb_id')->toArray();
 
         return [
             'megaembed_movies_total' => count($megaMovies),
             'megaembed_series_total' => count($megaSeries),
+            'megaembed_animes_total' => count($megaAnimes),
             'local_movies_total' => $localMoviesCount,
             'local_series_total' => $localSeriesCount,
+            'local_animes_total' => $localAnimesCount,
             'movies_imported_count' => count($importedMovieIds),
             'series_imported_count' => count($importedSeriesIds),
+            'animes_imported_count' => count($importedAnimeIds),
             'movies_pending_count' => max(0, count($megaMovies) - count($importedMovieIds)),
             'series_pending_count' => max(0, count($megaSeries) - count($importedSeriesIds)),
+            'animes_pending_count' => max(0, count($megaAnimes) - count($importedAnimeIds)),
         ];
     }
 
@@ -482,6 +547,11 @@ class MegaEmbedService
             ];
         }
 
+        // Se os metadados do TMDb indicam que é Anime (Animação japonesa), importar como Anime
+        if ($this->isAnimeTmdb($data)) {
+            return $this->importAnime($tmdbId, $overwrite);
+        }
+
         $posterPath = !empty($data['poster_path']) ? $this->coverPath . $data['poster_path'] : null;
         $backdropPath = !empty($data['backdrop_path']) ? $this->coverPath . $data['backdrop_path'] : null;
 
@@ -577,8 +647,23 @@ class MegaEmbedService
                             ]
                         );
 
-                        // Attach MegaEmbed episode streams
-                        $this->attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $epNumber);
+                        // Attach direct video streams para os primeiros episódios; os demais usam fallback e são resolvidos sob demanda com fontes diretas no EpisodeController
+                        if ($seasonNumber === 1 && $epNumber <= 5) {
+                            $this->attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $epNumber);
+                        } else {
+                            SerieVideo::updateOrCreate(
+                                [
+                                    'episode_id' => $episode->id,
+                                    'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$epNumber}"
+                                ],
+                                [
+                                    'server' => 'MegaEmbed (Player Web)',
+                                    'lang' => 'Português',
+                                    'embed' => 1,
+                                    'status' => 1,
+                                ]
+                            );
+                        }
 
                         $totalEpisodesImported++;
                     }
@@ -597,19 +682,143 @@ class MegaEmbedService
     }
 
     /**
+     * Check if TMDb series metadata corresponds to an Anime.
+     */
+    public function isAnimeTmdb(array $data): bool
+    {
+        $originCountry = $data['origin_country'] ?? [];
+        $originalLang = strtolower($data['original_language'] ?? '');
+        $genreIds = array_column($data['genres'] ?? [], 'id');
+
+        $isJapan = in_array('JP', $originCountry) || $originalLang === 'ja';
+        $isAnimation = in_array(16, $genreIds);
+
+        return $isJapan && $isAnimation;
+    }
+
+    /**
+     * Get or create an authenticated Guzzle client with moderator cookie session.
+     */
+    public function getModeratorSessionClient()
+    {
+        try {
+            $cookieFile = storage_path('app/megaembed_cookies.json');
+            $jar = new FileCookieJar($cookieFile, true);
+            $modClient = new Client([
+                'cookies' => $jar,
+                'verify' => false,
+                'timeout' => 10,
+                'headers' => [
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                ]
+            ]);
+
+            // Check if existing session is alive
+            $dashResp = $modClient->get('https://megaembed.com/moderador/dashboard', ['allow_redirects' => false]);
+            if ($dashResp->getStatusCode() === 200) {
+                return $modClient;
+            }
+
+            // Perform login if redirected or expired
+            $loginHtml = $modClient->get('https://megaembed.com/moderador/login')->getBody()->getContents();
+            if (preg_match('/name="csrf_token"\s+value="([^"]+)"/', $loginHtml, $m)) {
+                $csrf = $m[1];
+                $modClient->post('https://megaembed.com/moderador/login', [
+                    'form_params' => [
+                        'action' => 'login',
+                        'csrf_token' => $csrf,
+                        'website_hp' => '',
+                        'username' => 'anome242@gmail.com',
+                        'password' => 'Anome123456'
+                    ]
+                ]);
+                return $modClient;
+            }
+        } catch (\Throwable $e) {
+            Log::warning("MegaEmbed moderator session error: " . $e->getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch unmasked original embed/direct URLs added by moderators for a content and episode.
+     */
+    public function fetchModeratorOriginalLinks($type, $contentTmdbId, $seasonNumber = null, $episodeNumber = null)
+    {
+        $modClient = $this->getModeratorSessionClient();
+        if (!$modClient) return [];
+
+        try {
+            $endpoint = ($type === 'anime') ? 'animes' : 'series';
+            $searchHtml = $modClient->get("https://megaembed.com/moderador/{$endpoint}?search={$contentTmdbId}")->getBody()->getContents();
+            $contentId = null;
+
+            if (preg_match('/openEpisodesModal\((\d+)/', $searchHtml, $m)) {
+                $contentId = $m[1];
+            } elseif (preg_match('/deleteSeriesModAjax\((\d+)/', $searchHtml, $m)) {
+                $contentId = $m[1];
+            } elseif (preg_match('/' . $endpoint . '\?action=edit&id=(\d+)/', $searchHtml, $m)) {
+                $contentId = $m[1];
+            }
+
+            if (!$contentId) return [];
+
+            $seasons = json_decode($modClient->get("https://megaembed.com/moderador/{$endpoint}?action=get_seasons&series_id={$contentId}")->getBody()->getContents(), true);
+            if (!is_array($seasons)) return [];
+
+            foreach ($seasons as $season) {
+                if ($seasonNumber !== null && (int)($season['season_number'] ?? 0) !== (int)$seasonNumber) {
+                    continue;
+                }
+
+                $episodes = json_decode($modClient->get("https://megaembed.com/moderador/{$endpoint}?action=get_episodes&season_id={$season['id']}")->getBody()->getContents(), true);
+                if (!is_array($episodes)) continue;
+
+                foreach ($episodes as $ep) {
+                    if ((int)($ep['episode_number'] ?? 0) === (int)$episodeNumber) {
+                        $links = json_decode($modClient->get("https://megaembed.com/moderador/{$endpoint}?action=get_links&content_id={$contentId}&episode_id={$ep['id']}")->getBody()->getContents(), true);
+                        if (is_array($links)) {
+                            $extracted = [];
+                            foreach ($links as $l) {
+                                $u = $l['original_url'] ?? $l['url'] ?? '';
+                                if (!empty($u) && strpos($u, '******') === false) {
+                                    $extracted[] = $u;
+                                }
+                            }
+                            return $extracted;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("fetchModeratorOriginalLinks warning: " . $e->getMessage());
+        }
+
+        return [];
+    }
+
+    /**
      * Attach direct video sources to a series episode.
      */
     public function attachEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
     {
-        // 1. Extrair fontes diretas da request do MegaEmbed
+        // 1. Extrair fontes diretas da request do MegaEmbed (CDN MP4 / HLS)
         $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
-        if (!empty($directSources)) {
-            // Remover links antigos genéricos do mgeb.top
-            SerieVideo::where('episode_id', $episode->id)
-                ->where('server', 'MegaEmbed (Dublado)')
-                ->where('link', 'like', '%mgeb.top%')
-                ->delete();
 
+        // 2. Tentar também buscar fontes originais adicionadas pelos moderadores
+        $moderatorLinks = $this->fetchModeratorOriginalLinks('series', $tmdbId, $seasonNumber, $episodeNumber);
+
+        // Remover links antigos genéricos do mgeb.top
+        SerieVideo::where('episode_id', $episode->id)
+            ->where('server', 'MegaEmbed (Dublado)')
+            ->where('link', 'like', '%mgeb.top%')
+            ->delete();
+
+        $savedCount = 0;
+
+        // Salvar fontes diretas extraídas (MP4 / HLS)
+        if (!empty($directSources)) {
             foreach ($directSources as $index => $source) {
                 $file = trim($source['file'] ?? '');
                 if (empty($file)) continue;
@@ -629,10 +838,41 @@ class MegaEmbedService
                         'lang' => 'Português',
                         'hls' => $isHls,
                         'embed' => $isEmbed,
+                        'status' => 1,
                     ]
                 );
+                $savedCount++;
             }
-        } else {
+        }
+
+        // Salvar fontes originais dos moderadores (caso haja embeds adicionais como streamtape, etc.)
+        if (!empty($moderatorLinks)) {
+            foreach ($moderatorLinks as $idx => $modLink) {
+                $modLink = trim($modLink);
+                if (empty($modLink) || strpos($modLink, '******') !== false) continue;
+
+                $isHls = (strpos($modLink, '.m3u8') !== false) ? 1 : 0;
+                $isEmbed = \App\Helpers\EmbedHelper::isEmbedUrl($modLink) ? 1 : 0;
+                $optNum = $savedCount + $idx + 1;
+
+                SerieVideo::updateOrCreate(
+                    [
+                        'episode_id' => $episode->id,
+                        'link' => $modLink
+                    ],
+                    [
+                        'server' => "MegaEmbed (Fonte {$optNum})",
+                        'lang' => 'Português',
+                        'hls' => $isHls,
+                        'embed' => $isEmbed,
+                        'status' => 1,
+                    ]
+                );
+                $savedCount++;
+            }
+        }
+
+        if ($savedCount === 0) {
             // Fallback para player Web apenas se a extração direta falhar
             SerieVideo::updateOrCreate(
                 [
@@ -643,6 +883,7 @@ class MegaEmbedService
                     'server' => 'MegaEmbed (Player Web)',
                     'lang' => 'Português',
                     'embed' => 1,
+                    'status' => 1,
                 ]
             );
         }
@@ -657,16 +898,300 @@ class MegaEmbedService
                 'server' => 'MegaEmbed (Legendado)',
                 'lang' => 'Legendado',
                 'embed' => 1,
+                'status' => 1,
             ]
         );
     }
 
     /**
-     * Refresh streams for all movies and episodes that have TMDb IDs.
+     * Import an Anime with seasons and episodes by TMDb ID.
+     */
+    public function importAnime($tmdbId, $overwrite = false)
+    {
+        // Se estava anteriormente salvo como Série comum por engano, limpa da tabela series
+        $oldSerie = Serie::where('tmdb_id', $tmdbId)->first();
+        if ($oldSerie) {
+            $oldSeasonIds = Season::where('serie_id', $oldSerie->id)->pluck('id');
+            $oldEpisodeIds = Episode::whereIn('season_id', $oldSeasonIds)->pluck('id');
+
+            SerieVideo::whereIn('episode_id', $oldEpisodeIds)->delete();
+            Episode::whereIn('id', $oldEpisodeIds)->delete();
+            Season::whereIn('id', $oldSeasonIds)->delete();
+            SerieGenre::where('serie_id', $oldSerie->id)->delete();
+            SerieCast::where('serie_id', $oldSerie->id)->delete();
+            $oldSerie->delete();
+        }
+
+        $existing = Anime::where('tmdb_id', $tmdbId)->first();
+        if ($existing && !$overwrite) {
+            return [
+                'success' => true,
+                'status' => 'already_exists',
+                'type' => 'anime',
+                'id' => $existing->id,
+                'title' => $existing->name,
+                'message' => "Anime '{$existing->name}' já existe no banco de dados."
+            ];
+        }
+
+        $data = $this->getTmdbSeriesDetails($tmdbId);
+        if (!$data || empty($data['name'])) {
+            return [
+                'success' => false,
+                'status' => 'not_found',
+                'type' => 'anime',
+                'message' => "Anime TMDb #{$tmdbId} não encontrado na API do TheMovieDB."
+            ];
+        }
+
+        $posterPath = !empty($data['poster_path']) ? $this->coverPath . $data['poster_path'] : null;
+        $backdropPath = !empty($data['backdrop_path']) ? $this->coverPath . $data['backdrop_path'] : null;
+
+        $trailerUrl = null;
+        if (!empty($data['videos']['results'])) {
+            foreach ($data['videos']['results'] as $video) {
+                if (($video['site'] ?? '') === 'YouTube' && ($video['type'] ?? '') === 'Trailer') {
+                    $trailerUrl = 'https://www.youtube.com/watch?v=' . $video['key'];
+                    break;
+                }
+            }
+        }
+
+        $anime = Anime::updateOrCreate(
+            ['tmdb_id' => $tmdbId],
+            [
+                'name' => $data['name'],
+                'original_name' => $data['original_name'] ?? $data['name'],
+                'overview' => $data['overview'] ?? '',
+                'poster_path' => $posterPath,
+                'backdrop_path' => $backdropPath,
+                'backdrop_path_tv' => $backdropPath,
+                'vote_average' => $data['vote_average'] ?? 0,
+                'vote_count' => $data['vote_count'] ?? 0,
+                'popularity' => $data['popularity'] ?? 0,
+                'first_air_date' => $data['first_air_date'] ?? null,
+                'trailer_url' => $trailerUrl,
+                'active' => 1,
+                'is_anime' => 1,
+                'newEpisodes' => 1,
+            ]
+        );
+
+        // Genres
+        if (!empty($data['genres'])) {
+            foreach ($data['genres'] as $g) {
+                Genre::updateOrCreate(['id' => $g['id']], ['name' => $g['name']]);
+                AnimeGenre::firstOrCreate(['anime_id' => $anime->id, 'genre_id' => $g['id']]);
+            }
+        }
+
+        // Casters
+        if (!empty($data['credits']['cast'])) {
+            foreach (array_slice($data['credits']['cast'], 0, 10) as $c) {
+                $castProfile = !empty($c['profile_path']) ? $this->coverPath . $c['profile_path'] : null;
+                $cast = Cast::updateOrCreate(
+                    ['id' => $c['id']],
+                    [
+                        'name' => $c['name'],
+                        'original_name' => $c['original_name'] ?? $c['name'],
+                        'profile_path' => $castProfile,
+                        'character' => $c['character'] ?? '',
+                    ]
+                );
+                AnimeCast::firstOrCreate(['anime_id' => $anime->id, 'cast_id' => $cast->id]);
+            }
+        }
+
+        // Seasons & Episodes
+        $totalEpisodesImported = 0;
+        if (!empty($data['seasons'])) {
+            foreach ($data['seasons'] as $s) {
+                $seasonNumber = (int) $s['season_number'];
+                if ($seasonNumber < 1) continue; // Pula especiais (temporada 0)
+
+                $seasonPoster = !empty($s['poster_path']) ? $this->coverPath . $s['poster_path'] : $posterPath;
+                $season = AnimeSeason::updateOrCreate(
+                    [
+                        'anime_id' => $anime->id,
+                        'season_number' => $seasonNumber,
+                    ],
+                    [
+                        'name' => $s['name'] ?? ("Temporada {$seasonNumber}"),
+                        'overview' => $s['overview'] ?? '',
+                        'poster_path' => $seasonPoster,
+                        'air_date' => $s['air_date'] ?? null,
+                    ]
+                );
+
+                // Fetch season episodes
+                $seasonDetails = $this->getTmdbSeasonDetails($tmdbId, $seasonNumber);
+                if (!empty($seasonDetails['episodes'])) {
+                    foreach ($seasonDetails['episodes'] as $ep) {
+                        $epNumber = (int) $ep['episode_number'];
+                        $stillPath = !empty($ep['still_path']) ? $this->coverPath . $ep['still_path'] : null;
+
+                        $episode = AnimeEpisode::updateOrCreate(
+                            [
+                                'anime_season_id' => $season->id,
+                                'episode_number' => $epNumber,
+                            ],
+                            [
+                                'name' => $ep['name'] ?? ("Episódio {$epNumber}"),
+                                'overview' => $ep['overview'] ?? '',
+                                'still_path' => $stillPath,
+                                'still_path_tv' => $stillPath,
+                                'vote_average' => $ep['vote_average'] ?? 0,
+                                'air_date' => $ep['air_date'] ?? null,
+                                'enable_stream' => 1,
+                            ]
+                        );
+
+                        // Attach direct video streams para os primeiros episódios; os demais usam fallback e são resolvidos sob demanda com fontes diretas no EpisodeController
+                        if ($seasonNumber === 1 && $epNumber <= 5) {
+                            $this->attachAnimeEpisodeStreams($episode, $tmdbId, $seasonNumber, $epNumber);
+                        } else {
+                            AnimeVideo::updateOrCreate(
+                                [
+                                    'anime_episode_id' => $episode->id,
+                                    'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$epNumber}"
+                                ],
+                                [
+                                    'server' => 'MegaEmbed (Player Web)',
+                                    'lang' => 'Português',
+                                    'embed' => 1,
+                                    'status' => 1,
+                                ]
+                            );
+                        }
+
+                        $totalEpisodesImported++;
+                    }
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'status' => 'imported',
+            'type' => 'anime',
+            'id' => $anime->id,
+            'title' => $anime->name,
+            'episodes_count' => $totalEpisodesImported,
+            'message' => "Anime '{$anime->name}' importado com {$totalEpisodesImported} episódios."
+        ];
+    }
+
+    /**
+     * Attach direct video sources to an anime episode.
+     */
+    public function attachAnimeEpisodeStreams($episode, $tmdbId, $seasonNumber, $episodeNumber)
+    {
+        // 1. Extrair fontes diretas da request do MegaEmbed (CDN MP4 / HLS)
+        $directSources = $this->extractDirectSources($tmdbId, $seasonNumber, $episodeNumber);
+
+        // 2. Tentar também buscar fontes originais adicionadas pelos moderadores
+        $moderatorLinks = $this->fetchModeratorOriginalLinks('anime', $tmdbId, $seasonNumber, $episodeNumber);
+
+        // Remover links antigos genéricos do mgeb.top
+        AnimeVideo::where('anime_episode_id', $episode->id)
+            ->where('server', 'MegaEmbed (Dublado)')
+            ->where('link', 'like', '%mgeb.top%')
+            ->delete();
+
+        $savedCount = 0;
+
+        // Salvar fontes diretas extraídas (MP4 / HLS)
+        if (!empty($directSources)) {
+            foreach ($directSources as $index => $source) {
+                $file = trim($source['file'] ?? '');
+                if (empty($file)) continue;
+
+                $type = strtolower($source['type'] ?? '');
+                $label = $source['label'] ?? ('Opção ' . ($index + 1));
+                $isHls = ($type === 'hls' || strpos($file, '.m3u8') !== false) ? 1 : 0;
+                $isEmbed = ($type === 'iframe' || \App\Helpers\EmbedHelper::isEmbedUrl($file)) ? 1 : 0;
+
+                AnimeVideo::updateOrCreate(
+                    [
+                        'anime_episode_id' => $episode->id,
+                        'link' => $file
+                    ],
+                    [
+                        'server' => "MegaEmbed ({$label})",
+                        'lang' => 'Português',
+                        'hls' => $isHls,
+                        'embed' => $isEmbed,
+                        'status' => 1,
+                    ]
+                );
+                $savedCount++;
+            }
+        }
+
+        // Salvar fontes originais dos moderadores (caso haja embeds adicionais como streamtape, etc.)
+        if (!empty($moderatorLinks)) {
+            foreach ($moderatorLinks as $idx => $modLink) {
+                $modLink = trim($modLink);
+                if (empty($modLink) || strpos($modLink, '******') !== false) continue;
+
+                $isHls = (strpos($modLink, '.m3u8') !== false) ? 1 : 0;
+                $isEmbed = \App\Helpers\EmbedHelper::isEmbedUrl($modLink) ? 1 : 0;
+                $optNum = $savedCount + $idx + 1;
+
+                AnimeVideo::updateOrCreate(
+                    [
+                        'anime_episode_id' => $episode->id,
+                        'link' => $modLink
+                    ],
+                    [
+                        'server' => "MegaEmbed (Fonte {$optNum})",
+                        'lang' => 'Português',
+                        'hls' => $isHls,
+                        'embed' => $isEmbed,
+                        'status' => 1,
+                    ]
+                );
+                $savedCount++;
+            }
+        }
+
+        // Se nenhuma fonte direta ou moderador foi encontrada, fallback web player
+        if ($savedCount === 0) {
+            AnimeVideo::updateOrCreate(
+                [
+                    'anime_episode_id' => $episode->id,
+                    'link' => "https://mgeb.top/embed/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
+                ],
+                [
+                    'server' => 'MegaEmbed (Player Web)',
+                    'lang' => 'Português',
+                    'embed' => 1,
+                    'status' => 1,
+                ]
+            );
+        }
+
+        // 2. Legendado (Opcional / NHDAPI)
+        AnimeVideo::updateOrCreate(
+            [
+                'anime_episode_id' => $episode->id,
+                'link' => "https://nhdapi.com/embed/tv/{$tmdbId}/{$seasonNumber}/{$episodeNumber}"
+            ],
+            [
+                'server' => 'MegaEmbed (Legendado)',
+                'lang' => 'Legendado',
+                'embed' => 1,
+                'status' => 1,
+            ]
+        );
+    }
+
+    /**
+     * Refresh streams for all movies, series, and animes that have TMDb IDs.
      */
     public function refreshAllExistingStreams($type = 'all')
     {
-        $updated = ['movies' => 0, 'episodes' => 0];
+        $updated = ['movies' => 0, 'episodes' => 0, 'animes' => 0];
 
         if ($type === 'movie' || $type === 'all') {
             $movies = Movie::whereNotNull('tmdb_id')->get();
@@ -693,7 +1218,25 @@ class MegaEmbedService
             }
         }
 
+        if ($type === 'anime' || $type === 'all') {
+            $animeEpisodes = AnimeEpisode::with('season.anime')
+                ->whereHas('season.anime', function ($q) {
+                    $q->whereNotNull('tmdb_id');
+                })
+                ->get();
+
+            foreach ($animeEpisodes as $episode) {
+                $season = $episode->season;
+                $anime = $season ? $season->anime : null;
+                if ($anime && $anime->tmdb_id && $season->season_number && $episode->episode_number) {
+                    $this->attachAnimeEpisodeStreams($episode, $anime->tmdb_id, $season->season_number, $episode->episode_number);
+                    $updated['animes']++;
+                }
+            }
+        }
+
         return $updated;
     }
 }
+
 
