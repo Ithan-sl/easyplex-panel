@@ -14,18 +14,23 @@
 
 
     <div v-if="index" class="col-md-6 grid-margin">
-   <ul class="navbar-nav mr-lg-4 w-100">
-          <li class="nav-item nav-search d-none d-lg-block w-100">
-            <div class="input-group">
-              <div class="input-group-prepend">
-                <span class="input-group-text" id="search">
-                  <i class="mdi mdi-magnify"></i>
-                </span>
-              </div>
-              <input v-model="search" type="text" class="form-control" placeholder="Search now" aria-label="search" aria-describedby="search">
+      <ul class="navbar-nav mr-lg-4 w-100">
+        <li class="nav-item nav-search w-100">
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text" id="search" @click="searchNow" style="cursor: pointer">
+                <i class="mdi" :class="searchLoading ? 'mdi-loading mdi-spin' : 'mdi-magnify'"></i>
+              </span>
             </div>
-          </li>
-        </ul>
+            <input v-model="search" @input="onSearchInput" @keydown.enter="searchNow" type="text" class="form-control" placeholder="Search by name or TMDB ID..." aria-label="search" aria-describedby="search">
+            <div class="input-group-append" v-if="search">
+              <span class="input-group-text" @click="clearSearch" style="cursor: pointer">
+                <i class="mdi mdi-close"></i>
+              </span>
+            </div>
+          </div>
+        </li>
+      </ul>
     </div>
 
     <div class="col-lg-12 grid-margin stretch-card" v-if="index">
@@ -83,7 +88,7 @@
               </tbody>
               <paginate
                 :list="filteredSeries"
-                :per="5"
+                :per="10"
                 name="filteredSeries"
                 tag="tbody"
                 v-if="filteredSeries.length"
@@ -889,6 +894,7 @@ export default {
       posterSeason: "",
       stillEpisode: "",
       search: "",
+      searchLoading: false,
       servers: [],
       server: "",
       season: null,
@@ -911,14 +917,38 @@ export default {
     };
   },
   async mounted() {
-    let response = await axios.get(url + "/admin/series/data");
-    this.series = response.data.data;
-    response = await axios.get(url + "/admin/servers/dataservers");
+    await this.fetchSeries();
+    let response = await axios.get(url + "/admin/servers/dataservers");
     this.servers = response.data;
     response = await axios.get(url + "/admin/genres/datagenres");
     this.options = response.data;
   },
   methods: {
+    onSearchInput: _.debounce(function () {
+      this.fetchSeries(this.search);
+    }, 400),
+    searchNow() {
+      this.fetchSeries(this.search);
+    },
+    clearSearch() {
+      this.search = "";
+      this.fetchSeries("");
+    },
+    async fetchSeries(query = "") {
+      this.searchLoading = true;
+      try {
+        let params = {};
+        if (query && query.trim().length > 0) {
+          params.search = query.trim();
+        }
+        let response = await axios.get(url + "/admin/series/data", { params });
+        this.series = response.data.data ? response.data.data : response.data;
+      } catch (error) {
+        console.error("Error fetching series:", error);
+      } finally {
+        this.searchLoading = false;
+      }
+    },
     create() {
       this.index = false;
       this.edit = false;
@@ -1691,8 +1721,16 @@ export default {
   computed: {
     // filter the series array with the search matches and return the filtered array
     filteredSeries() {
+      if (!this.series || !Array.isArray(this.series)) return [];
+      if (!this.search || this.search.trim() === "") {
+        return this.series;
+      }
+      const q = this.search.toLowerCase();
       return this.series.filter((serie) => {
-        return serie.name.toLowerCase().match(this.search.toLowerCase());
+        const name = (serie.name || "").toLowerCase();
+        const orig = (serie.original_name || "").toLowerCase();
+        const tmdb = (serie.tmdb_id || "").toString();
+        return name.includes(q) || orig.includes(q) || tmdb.includes(q);
       });
     },
   },

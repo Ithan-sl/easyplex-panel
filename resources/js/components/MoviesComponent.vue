@@ -18,14 +18,19 @@
 
 <div v-if="index" class="col-md-6 grid-margin">
    <ul class="navbar-nav mr-lg-4 w-100">
-          <li class="nav-item nav-search d-none d-lg-block w-100">
+          <li class="nav-item nav-search w-100">
             <div class="input-group">
               <div class="input-group-prepend">
-                <span class="input-group-text" id="search">
-                  <i class="mdi mdi-magnify"></i>
+                <span class="input-group-text" id="search" @click="searchNow" style="cursor: pointer">
+                  <i class="mdi" :class="searchLoading ? 'mdi-loading mdi-spin' : 'mdi-magnify'"></i>
                 </span>
               </div>
-              <input v-model="search" type="text" class="form-control" placeholder="Search now" aria-label="search" aria-describedby="search">
+              <input v-model="search" @input="onSearchInput" @keydown.enter="searchNow" type="text" class="form-control" placeholder="Search by title or TMDB ID..." aria-label="search" aria-describedby="search">
+              <div class="input-group-append" v-if="search">
+                <span class="input-group-text" @click="clearSearch" style="cursor: pointer">
+                  <i class="mdi mdi-close"></i>
+                </span>
+              </div>
             </div>
           </li>
         </ul>
@@ -89,7 +94,7 @@
               </tbody>
               <paginate
                 :list="filteredMovies"
-                :per="5"
+                :per="10"
                 name="filteredMovies"
                 tag="tbody"
                 v-if="filteredMovies.length"
@@ -715,6 +720,7 @@ export default {
       video: null,
       substitle: null,
       search: "",
+      searchLoading: false,
       servers: [],
       server: "",
       link: "",
@@ -727,10 +733,9 @@ export default {
     };
   },
   async mounted() {
-    let response = await axios.get(url + "/admin/movies/dataweb");
-    this.movies = response.data.data;
+    await this.fetchMovies();
     
-    response = await axios.get(url + "/admin/servers/dataservers");
+    let response = await axios.get(url + "/admin/servers/dataservers");
     this.servers = response.data;
 
     response = await axios.get(url + "/admin/genres/data");
@@ -741,6 +746,31 @@ export default {
     }
   },
   methods: {
+    onSearchInput: _.debounce(function () {
+      this.fetchMovies(this.search);
+    }, 400),
+    searchNow() {
+      this.fetchMovies(this.search);
+    },
+    clearSearch() {
+      this.search = "";
+      this.fetchMovies("");
+    },
+    async fetchMovies(query = "") {
+      this.searchLoading = true;
+      try {
+        let params = {};
+        if (query && query.trim().length > 0) {
+          params.search = query.trim();
+        }
+        let response = await axios.get(url + "/admin/movies/dataweb", { params });
+        this.movies = response.data.data ? response.data.data : response.data;
+      } catch (error) {
+        console.error("Error fetching movies:", error);
+      } finally {
+        this.searchLoading = false;
+      }
+    },
     // change the view to the create form
     create() {
       this.index = false;
@@ -1090,11 +1120,16 @@ export default {
   computed: {
     // filter the movies array with the search matches and return the filtered array
     filteredMovies() {
+      if (!this.movies || !Array.isArray(this.movies)) return [];
+      if (!this.search || this.search.trim() === "") {
+        return this.movies;
+      }
+      const q = this.search.toLowerCase();
       return this.movies.filter((movie) => {
-        return (
-          movie.title.toLowerCase().match(this.search.toLowerCase()) ||
-          movie.tmdb_id.toString().match(this.search.toLowerCase())
-        );
+        const title = (movie.title || "").toLowerCase();
+        const orig = (movie.original_name || "").toLowerCase();
+        const tmdb = (movie.tmdb_id || "").toString();
+        return title.includes(q) || orig.includes(q) || tmdb.includes(q);
       });
     },
   },

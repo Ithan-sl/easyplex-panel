@@ -134,12 +134,19 @@ class MovieController extends Controller
     // return all the movies for the admin panel
     public function web()
     {
+        $search = trim(request()->input('search', request()->input('q', '')));
+        $query = Movie::withOnly(['genres.genre']);
 
-        $moviesdata = Movie::query()->with(['genres', 'casters'])->orderByDesc('created_at')
-            ->paginate(12);
-
-        //ray()->showQueries1();
-        ray()->measure();
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'LIKE', "%{$search}%")
+                  ->orWhere('original_name', 'LIKE', "%{$search}%")
+                  ->orWhere('tmdb_id', 'LIKE', "%{$search}%");
+            });
+            $moviesdata = $query->orderByDesc('id')->paginate(50);
+        } else {
+            $moviesdata = $query->orderByDesc('id')->paginate(30);
+        }
 
         return response()->json($moviesdata);
     }

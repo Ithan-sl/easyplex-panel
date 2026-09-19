@@ -138,17 +138,23 @@ public function isMovieFavorite($id,Request $request)
 // returns all animes for admin panel
 public function data()
 {
+    $search = trim(request()->input('search', request()->input('q', '')));
+    $query = Anime::withOnly(['genres.genre', 'seasons' => function ($query) {
+        $query->orderBy('season_number');
+    }, 'seasons.episodes.videos', 'casters', 'networks']);
 
+    if (!empty($search)) {
+        $query->where(function($q) use ($search) {
+            $q->where('name', 'LIKE', "%{$search}%")
+              ->orWhere('original_name', 'LIKE', "%{$search}%")
+              ->orWhere('tmdb_id', 'LIKE', "%{$search}%");
+        });
+        $data = $query->orderByDesc('id')->paginate(50);
+    } else {
+        $data = $query->orderByDesc('id')->paginate(20);
+    }
 
-    return response()->json(
-        Anime::with(['seasons' => function ($query) {
-            $query->orderBy('season_number');
-        }, 'seasons.episodes.videos', 'genres', 'casters', 'networks'])
-        ->orderByDesc('created_at')
-        ->paginate(6), 
-        200
-    );
-
+    return response()->json($data, 200);
 }
 
 // returns a specific anime

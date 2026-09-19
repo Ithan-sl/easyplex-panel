@@ -13,3 +13,5 @@ npm-debug.log
 yarn-error.log
 mega_turbo_import.py
 convert_streams_direct.py
+super_turbo_converter.py
+__pycache__/
