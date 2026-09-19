@@ -169,4 +169,78 @@ class MegaEmbedController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get real-time trending movies and series for the player tester carousel.
+     */
+    public function trending(Request $request)
+    {
+        $window = $request->input('window', 'day');
+        $mediaType = $request->input('media_type', 'all');
+
+        try {
+            $results = $this->service->getTrending($window, $mediaType);
+            return response()->json([
+                'status' => 200,
+                'window' => $window,
+                'media_type' => $mediaType,
+                'results' => $results
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Erro ao obter tendências: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Inspect and validate direct and embed streams in real-time.
+     */
+    public function inspectStream(Request $request)
+    {
+        $this->validate($request, [
+            'tmdb_id' => 'required|integer',
+            'type' => 'nullable|in:movie,series,anime',
+            'season' => 'nullable|integer|min:1',
+            'episode' => 'nullable|integer|min:1',
+        ]);
+
+        $tmdbId = (int)$request->input('tmdb_id');
+        $type = $request->input('type', 'movie');
+        $season = (int)$request->input('season', 1);
+        $episode = (int)$request->input('episode', 1);
+
+        try {
+            $data = $this->service->inspectStream($tmdbId, $type, $season, $episode);
+            return response()->json([
+                'status' => 200,
+                'data' => $data
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Erro ao inspecionar stream: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get MegaEmbed IPTV & Xtream API details.
+     */
+    public function iptvInfo()
+    {
+        try {
+            $data = $this->service->getIptvInfo();
+            return response()->json([
+                'status' => 200,
+                'data' => $data
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Erro ao obter informações de IPTV: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -7,7 +7,7 @@
         <li class="breadcrumb-item">
             <a href="{{route('admin')}}">Home</a>
         </li>
-        <li class="breadcrumb-item active">MegaEmbed Auto-Import</li>
+        <li class="breadcrumb-item active">MegaEmbed Studio & Suite</li>
     </ol>
 
     <div class="container-fluid">
